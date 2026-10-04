@@ -1,0 +1,20 @@
+struct Point {
+    x: i64;
+    y: i64;
+}
+
+function square(x: i64) -> i64 {
+    return x * x;
+}
+
+function main() -> i64 {
+    let p: Point = new Point();
+    p.x = 3;
+    p.y = 4;
+    let a = square(p.x);
+    let b = square(p.y);
+    let c = a + b;
+    print("result:");
+    print("25");
+    return c;
+}

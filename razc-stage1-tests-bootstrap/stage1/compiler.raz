@@ -1,0 +1,269 @@
+// Stage-1 milestone: lexer + parser + AST + tiny RIR lowering, written in Raz.
+// This is intentionally small. It is the first native compiler component that
+// understands source structure instead of merely copying text.
+
+struct Token {
+    kind: i64;
+    text: string;
+}
+
+struct Expr {
+    kind: i64;
+    left: i64;
+    right: i64;
+    value: i64;
+    text: string;
+}
+
+struct ParseState {
+    tokens: List<Token>;
+    pos: i64;
+    nodes: List<Expr>;
+    nextId: i64;
+    last: i64;
+}
+
+function isSpace(c: i64) -> bool {
+    return c == 32 || c == 9 || c == 10 || c == 13;
+}
+
+function isDigit(c: i64) -> bool {
+    return c >= 48 && c <= 57;
+}
+
+function isAlpha(c: i64) -> bool {
+    return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95;
+}
+
+function lex(source: string) -> List<Token> {
+    let out: List<Token> = [];
+    let i: i64 = 0;
+    while (i < length(source)) {
+        let c: i64 = source[i];
+        if (isSpace(c)) {
+            i = i + 1;
+        } else if (isDigit(c)) {
+            let start: i64 = i;
+            while (i < length(source) && isDigit(source[i])) {
+                i = i + 1;
+            }
+            let t: Token = new Token();
+            t.kind = 2;
+            t.text = slice(source, start, i);
+            out = append(out, t);
+        } else if (isAlpha(c)) {
+            let start: i64 = i;
+            while (i < length(source) && (isAlpha(source[i]) || isDigit(source[i]))) {
+                i = i + 1;
+            }
+            let word: string = slice(source, start, i);
+            let t: Token = new Token();
+            t.text = word;
+            if (word == "function") {
+                t.kind = 10;
+            } else if (word == "let") {
+                t.kind = 11;
+            } else if (word == "return") {
+                t.kind = 12;
+            } else {
+                t.kind = 1;
+            }
+            out = append(out, t);
+        } else {
+            let t: Token = new Token();
+            t.text = slice(source, i, i + 1);
+            if (c == 40) {
+                t.kind = 20;
+            } else if (c == 41) {
+                t.kind = 21;
+            } else if (c == 123) {
+                t.kind = 22;
+            } else if (c == 125) {
+                t.kind = 23;
+            } else if (c == 59) {
+                t.kind = 24;
+            } else if (c == 61) {
+                t.kind = 25;
+            } else if (c == 43) {
+                t.kind = 30;
+            } else if (c == 45) {
+                t.kind = 31;
+            } else if (c == 42) {
+                t.kind = 32;
+            } else if (c == 47) {
+                t.kind = 33;
+            } else {
+                t.kind = 99;
+            }
+            out = append(out, t);
+            i = i + 1;
+        }
+    }
+    let eof: Token = new Token();
+    eof.kind = 0;
+    eof.text = "";
+    out = append(out, eof);
+    return out;
+}
+
+function precedence(kind: i64) -> i64 {
+    if (kind == 30 || kind == 31) {
+        return 10;
+    }
+    if (kind == 32 || kind == 33) {
+        return 20;
+    }
+    return -1;
+}
+
+function addNode(state: ParseState, e: Expr) -> ParseState {
+    let id: i64 = state.nextId;
+    state.nodes = append(state.nodes, e);
+    state.nextId = state.nextId + 1;
+    state.last = id;
+    return state;
+}
+
+function parsePrimary(state: ParseState) -> ParseState {
+    let t: Token = state.tokens[state.pos];
+    if (t.kind == 2) {
+        let e: Expr = new Expr();
+        e.kind = 1;
+        e.value = 0;
+        let i: i64 = 0;
+        while (i < length(t.text)) {
+            e.value = e.value * 10 + (t.text[i] - 48);
+            i = i + 1;
+        }
+        state.pos = state.pos + 1;
+        return addNode(state, e);
+    }
+    if (t.kind == 1) {
+        let e: Expr = new Expr();
+        e.kind = 2;
+        e.text = t.text;
+        state.pos = state.pos + 1;
+        return addNode(state, e);
+    }
+    if (t.kind == 20) {
+        state.pos = state.pos + 1;
+        state = parseExpression(state, 0);
+        if (state.tokens[state.pos].kind == 21) {
+            state.pos = state.pos + 1;
+        }
+        return state;
+    }
+    return state;
+}
+
+function parseExpression(state: ParseState, minPrec: i64) -> ParseState {
+    state = parsePrimary(state);
+    let k: i64 = state.tokens[state.pos].kind;
+    let p: i64 = precedence(k);
+    while (p >= minPrec) {
+        let op: string = state.tokens[state.pos].text;
+        let left: i64 = state.last;
+        state.pos = state.pos + 1;
+        state = parseExpression(state, p + 1);
+        let right: i64 = state.last;
+        let e: Expr = new Expr();
+        e.kind = 3;
+        e.left = left;
+        e.right = right;
+        e.text = op;
+        state = addNode(state, e);
+        k = state.tokens[state.pos].kind;
+        p = precedence(k);
+    }
+    return state;
+}
+
+function lowerExpr(nodes: List<Expr>, id: i64) -> string {
+    let e: Expr = nodes[id];
+    if (e.kind == 1) {
+        return "const " + int_to_string(e.value) + "\n";
+    }
+    if (e.kind == 2) {
+        return "load " + e.text + "\n";
+    }
+    let out: string = lowerExpr(nodes, e.left);
+    out = out + lowerExpr(nodes, e.right);
+    if (e.text == "+") {
+        out = out + "add\n";
+    } else if (e.text == "-") {
+        out = out + "sub\n";
+    } else if (e.text == "*") {
+        out = out + "mul\n";
+    } else if (e.text == "/") {
+        out = out + "div\n";
+    }
+    return out;
+}
+
+function compileSubset(source: string) -> string {
+    let state: ParseState = new ParseState();
+    state.tokens = lex(source);
+    state.pos = 0;
+    state.nodes = [];
+    state.nextId = 0;
+    state.last = 0;
+    let out: string = "rir 0\n";
+
+    while (state.tokens[state.pos].kind != 0) {
+        if (state.tokens[state.pos].kind == 10) {
+            state.pos = state.pos + 1;
+            let name: string = state.tokens[state.pos].text;
+            state.pos = state.pos + 1;
+            while (state.tokens[state.pos].kind != 22 && state.tokens[state.pos].kind != 0) {
+                state.pos = state.pos + 1;
+            }
+            if (state.tokens[state.pos].kind == 22) {
+                state.pos = state.pos + 1;
+            }
+            out = out + "function " + name + "\n";
+
+            while (state.tokens[state.pos].kind != 23 && state.tokens[state.pos].kind != 0) {
+                if (state.tokens[state.pos].kind == 11) {
+                    state.pos = state.pos + 1;
+                    let variable: string = state.tokens[state.pos].text;
+                    state.pos = state.pos + 1;
+                    while (state.tokens[state.pos].kind != 25 && state.tokens[state.pos].kind != 0) {
+                        state.pos = state.pos + 1;
+                    }
+                    if (state.tokens[state.pos].kind == 25) {
+                        state.pos = state.pos + 1;
+                    }
+                    state = parseExpression(state, 0);
+                    out = out + "let " + variable + "\n";
+                    out = out + lowerExpr(state.nodes, state.last);
+                    if (state.tokens[state.pos].kind == 24) {
+                        state.pos = state.pos + 1;
+                    }
+                } else if (state.tokens[state.pos].kind == 12) {
+                    state.pos = state.pos + 1;
+                    state = parseExpression(state, 0);
+                    out = out + lowerExpr(state.nodes, state.last);
+                    out = out + "return\n";
+                    if (state.tokens[state.pos].kind == 24) {
+                        state.pos = state.pos + 1;
+                    }
+                } else {
+                    state.pos = state.pos + 1;
+                }
+            }
+            if (state.tokens[state.pos].kind == 23) {
+                state.pos = state.pos + 1;
+            }
+        } else {
+            state.pos = state.pos + 1;
+        }
+    }
+    return out;
+}
+
+function main() -> i64 {
+    let source: string = readFile("stage1/input.raz");
+    let rir: string = compileSubset(source);
+    writeFile("stage1/output.rir", rir);
+    return length(rir);
+}

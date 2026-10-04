@@ -1,0 +1,17 @@
+
+> test
+> node tests/run-tests.mjs
+
+Stage-0 test suite
+compiler: /mnt/data/razc-project/razc-stage0.mjs
+
+[PASS] arithmetic (exit=207)
+[PASS] loop (exit=120)
+[PASS] struct (exit=25)
+[PASS] list-generic (exit=32)
+[PASS] short-circuit (exit=0)
+[PASS] string (exit=9)
+[PASS] stage1-native-frontend (native compiler produced RIR (77 bytes))
+[PASS] type-error (expected semantic failure)
+
+passed=8 failed=0

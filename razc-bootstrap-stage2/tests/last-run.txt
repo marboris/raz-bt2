@@ -1,0 +1,29 @@
+Stage-0 / Stage-1 / Stage-2 test results
+
+npm test
+----------
+[PASS] arithmetic (exit=207)
+[PASS] loop (exit=120)
+[PASS] struct (exit=25)
+[PASS] list-generic (exit=32)
+[PASS] short-circuit (exit=0)
+[PASS] string (exit=9)
+[PASS] ref-list-mutation (exit=3)
+[PASS] stage1-native-frontend (frontend RIR=1702 bytes)
+[PASS] stage2-native-backend (RIR=402 bytes; C++=807 bytes; exit=46)
+[PASS] type-error (expected semantic failure)
+passed=10 failed=0
+
+npm run test:bootstrap
+----------------------
+[PASS] arithmetic (exit=207)
+[PASS] loop (exit=120)
+[PASS] struct (exit=25)
+[PASS] list-generic (exit=32)
+[PASS] short-circuit (exit=0)
+[PASS] string (exit=9)
+[PASS] ref-list-mutation (exit=3)
+[PASS] stage1-native-frontend (frontend RIR=1702 bytes; compiler self-RIR=158747 bytes)
+[PASS] stage2-native-backend (RIR=402 bytes; C++=807 bytes; exit=46)
+[PASS] type-error (expected semantic failure)
+passed=10 failed=0

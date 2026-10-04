@@ -1,0 +1,10 @@
+rir 0
+function add_demo
+let a
+const 40
+load a
+const 2
+const 3
+mul
+add
+return

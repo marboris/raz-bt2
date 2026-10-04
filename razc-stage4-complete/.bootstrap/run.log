@@ -1,0 +1,14 @@
+
+> bootstrap
+> node scripts/bootstrap.mjs
+
+[bootstrap] Stage-0 -> native Stage-1
+[bootstrap] native Stage-1 -> compiler.raz -> RIR
+[bootstrap] native frontend rebuilt through host backend
+Raz bootstrap report
+=====================
+source: /mnt/data/razc-project/stage1/compiler.raz
+stage-1 RIR bytes: 169098
+frontend self-parse: OK
+host rebuild: OK
+RIR exact match: OK

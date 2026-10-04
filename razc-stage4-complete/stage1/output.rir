@@ -1,0 +1,6942 @@
+rir 1
+struct Token
+  field i64 kind
+  field string text
+  field i64 pos
+struct Expr
+  field i64 kind
+  field string op
+  field string text
+  field i64 left
+  field i64 right
+  field string valueText
+  field List<i64> args
+struct Stmt
+  field i64 kind
+  field string name
+  field string type
+  field i64 expr
+  field i64 left
+  field i64 right
+  field List<i64> thenStmts
+  field List<i64> elseStmts
+  field List<i64> body
+struct Param
+  field string name
+  field string type
+struct Field
+  field string name
+  field string type
+struct FunctionDef
+  field string name
+  field List<Param> params
+  field string returnType
+  field List<i64> body
+struct StructDef
+  field string name
+  field List<Field> fields
+struct Program
+  field List<Expr> exprs
+  field List<Stmt> stmts
+  field List<FunctionDef> functions
+  field List<StructDef> structs
+struct ParserState
+  field List<Token> tokens
+  field i64 pos
+  field List<Expr> exprs
+  field List<Stmt> stmts
+  field List<FunctionDef> functions
+  field List<StructDef> structs
+  field i64 lastTokenKind
+  field string lastTokenText
+  field i64 lastExpr
+  field i64 lastStmt
+  field List<i64> lastList
+  field List<i64> lastArgs
+  field string lastType
+  field FunctionDef lastFunction
+  field StructDef lastStruct
+struct EmitState
+  field List<string> lines
+  field i64 temp
+  field i64 label
+  field string lastValue
+struct Binding
+  field string name
+  field string type
+struct SemanticState
+  field bool ok
+  field string message
+function tokenValue(i64 kind, string text, i64 pos) -> Token
+entry:
+    %t0 = new Token
+    local Token t
+    store t, %t0
+    %t1 = load kind
+    field_set t.kind = %t1
+    %t2 = load text
+    field_set t.text = %t2
+    %t3 = load pos
+    field_set t.pos = %t3
+    %t4 = load t
+    return %t4
+endfunction
+function isSpace(i64 c) -> bool
+entry:
+    %t5 = load c
+    %t6 = const i64 32
+    %t7 = eq %t5, %t6
+    %t8 = load c
+    %t9 = const i64 9
+    %t10 = eq %t8, %t9
+    %t11 = or %t7, %t10
+    %t12 = load c
+    %t13 = const i64 10
+    %t14 = eq %t12, %t13
+    %t15 = or %t11, %t14
+    %t16 = load c
+    %t17 = const i64 13
+    %t18 = eq %t16, %t17
+    %t19 = or %t15, %t18
+    return %t19
+endfunction
+function isDigit(i64 c) -> bool
+entry:
+    %t20 = load c
+    %t21 = const i64 48
+    %t22 = ge %t20, %t21
+    %t23 = load c
+    %t24 = const i64 57
+    %t25 = le %t23, %t24
+    %t26 = and %t22, %t25
+    return %t26
+endfunction
+function isAlpha(i64 c) -> bool
+entry:
+    %t27 = load c
+    %t28 = const i64 65
+    %t29 = ge %t27, %t28
+    %t30 = load c
+    %t31 = const i64 90
+    %t32 = le %t30, %t31
+    %t33 = and %t29, %t32
+    %t34 = load c
+    %t35 = const i64 97
+    %t36 = ge %t34, %t35
+    %t37 = load c
+    %t38 = const i64 122
+    %t39 = le %t37, %t38
+    %t40 = and %t36, %t39
+    %t41 = or %t33, %t40
+    %t42 = load c
+    %t43 = const i64 95
+    %t44 = eq %t42, %t43
+    %t45 = or %t41, %t44
+    return %t45
+endfunction
+function isAlphaNum(i64 c) -> bool
+entry:
+    %t46 = load c
+    %t47 = call isAlpha(%t46)
+    %t48 = load c
+    %t49 = call isDigit(%t48)
+    %t50 = or %t47, %t49
+    return %t50
+endfunction
+function keywordKind(string word) -> i64
+entry:
+    %t51 = load word
+    %t52 = const string "function"
+    %t53 = eq %t51, %t52
+    branch %t53 ? then0 : else1
+then0:
+    %t54 = const i64 10
+    return %t54
+    jump endif2
+else1:
+    jump endif2
+endif2:
+    %t55 = load word
+    %t56 = const string "struct"
+    %t57 = eq %t55, %t56
+    branch %t57 ? then3 : else4
+then3:
+    %t58 = const i64 11
+    return %t58
+    jump endif5
+else4:
+    jump endif5
+endif5:
+    %t59 = load word
+    %t60 = const string "let"
+    %t61 = eq %t59, %t60
+    branch %t61 ? then6 : else7
+then6:
+    %t62 = const i64 12
+    return %t62
+    jump endif8
+else7:
+    jump endif8
+endif8:
+    %t63 = load word
+    %t64 = const string "return"
+    %t65 = eq %t63, %t64
+    branch %t65 ? then9 : else10
+then9:
+    %t66 = const i64 13
+    return %t66
+    jump endif11
+else10:
+    jump endif11
+endif11:
+    %t67 = load word
+    %t68 = const string "if"
+    %t69 = eq %t67, %t68
+    branch %t69 ? then12 : else13
+then12:
+    %t70 = const i64 14
+    return %t70
+    jump endif14
+else13:
+    jump endif14
+endif14:
+    %t71 = load word
+    %t72 = const string "else"
+    %t73 = eq %t71, %t72
+    branch %t73 ? then15 : else16
+then15:
+    %t74 = const i64 15
+    return %t74
+    jump endif17
+else16:
+    jump endif17
+endif17:
+    %t75 = load word
+    %t76 = const string "while"
+    %t77 = eq %t75, %t76
+    branch %t77 ? then18 : else19
+then18:
+    %t78 = const i64 16
+    return %t78
+    jump endif20
+else19:
+    jump endif20
+endif20:
+    %t79 = load word
+    %t80 = const string "true"
+    %t81 = eq %t79, %t80
+    branch %t81 ? then21 : else22
+then21:
+    %t82 = const i64 17
+    return %t82
+    jump endif23
+else22:
+    jump endif23
+endif23:
+    %t83 = load word
+    %t84 = const string "false"
+    %t85 = eq %t83, %t84
+    branch %t85 ? then24 : else25
+then24:
+    %t86 = const i64 18
+    return %t86
+    jump endif26
+else25:
+    jump endif26
+endif26:
+    %t87 = load word
+    %t88 = const string "new"
+    %t89 = eq %t87, %t88
+    branch %t89 ? then27 : else28
+then27:
+    %t90 = const i64 19
+    return %t90
+    jump endif29
+else28:
+    jump endif29
+endif29:
+    %t91 = const i64 1
+    return %t91
+endfunction
+function operatorKind(string text) -> i64
+entry:
+    %t92 = load text
+    %t93 = const string "("
+    %t94 = eq %t92, %t93
+    branch %t94 ? then30 : else31
+then30:
+    %t95 = const i64 20
+    return %t95
+    jump endif32
+else31:
+    jump endif32
+endif32:
+    %t96 = load text
+    %t97 = const string ")"
+    %t98 = eq %t96, %t97
+    branch %t98 ? then33 : else34
+then33:
+    %t99 = const i64 21
+    return %t99
+    jump endif35
+else34:
+    jump endif35
+endif35:
+    %t100 = load text
+    %t101 = const string "{"
+    %t102 = eq %t100, %t101
+    branch %t102 ? then36 : else37
+then36:
+    %t103 = const i64 22
+    return %t103
+    jump endif38
+else37:
+    jump endif38
+endif38:
+    %t104 = load text
+    %t105 = const string "}"
+    %t106 = eq %t104, %t105
+    branch %t106 ? then39 : else40
+then39:
+    %t107 = const i64 23
+    return %t107
+    jump endif41
+else40:
+    jump endif41
+endif41:
+    %t108 = load text
+    %t109 = const string ";"
+    %t110 = eq %t108, %t109
+    branch %t110 ? then42 : else43
+then42:
+    %t111 = const i64 24
+    return %t111
+    jump endif44
+else43:
+    jump endif44
+endif44:
+    %t112 = load text
+    %t113 = const string ":"
+    %t114 = eq %t112, %t113
+    branch %t114 ? then45 : else46
+then45:
+    %t115 = const i64 25
+    return %t115
+    jump endif47
+else46:
+    jump endif47
+endif47:
+    %t116 = load text
+    %t117 = const string ","
+    %t118 = eq %t116, %t117
+    branch %t118 ? then48 : else49
+then48:
+    %t119 = const i64 26
+    return %t119
+    jump endif50
+else49:
+    jump endif50
+endif50:
+    %t120 = load text
+    %t121 = const string "."
+    %t122 = eq %t120, %t121
+    branch %t122 ? then51 : else52
+then51:
+    %t123 = const i64 27
+    return %t123
+    jump endif53
+else52:
+    jump endif53
+endif53:
+    %t124 = load text
+    %t125 = const string "["
+    %t126 = eq %t124, %t125
+    branch %t126 ? then54 : else55
+then54:
+    %t127 = const i64 28
+    return %t127
+    jump endif56
+else55:
+    jump endif56
+endif56:
+    %t128 = load text
+    %t129 = const string "]"
+    %t130 = eq %t128, %t129
+    branch %t130 ? then57 : else58
+then57:
+    %t131 = const i64 29
+    return %t131
+    jump endif59
+else58:
+    jump endif59
+endif59:
+    %t132 = load text
+    %t133 = const string "="
+    %t134 = eq %t132, %t133
+    branch %t134 ? then60 : else61
+then60:
+    %t135 = const i64 30
+    return %t135
+    jump endif62
+else61:
+    jump endif62
+endif62:
+    %t136 = load text
+    %t137 = const string "+"
+    %t138 = eq %t136, %t137
+    branch %t138 ? then63 : else64
+then63:
+    %t139 = const i64 31
+    return %t139
+    jump endif65
+else64:
+    jump endif65
+endif65:
+    %t140 = load text
+    %t141 = const string "-"
+    %t142 = eq %t140, %t141
+    branch %t142 ? then66 : else67
+then66:
+    %t143 = const i64 32
+    return %t143
+    jump endif68
+else67:
+    jump endif68
+endif68:
+    %t144 = load text
+    %t145 = const string "*"
+    %t146 = eq %t144, %t145
+    branch %t146 ? then69 : else70
+then69:
+    %t147 = const i64 33
+    return %t147
+    jump endif71
+else70:
+    jump endif71
+endif71:
+    %t148 = load text
+    %t149 = const string "/"
+    %t150 = eq %t148, %t149
+    branch %t150 ? then72 : else73
+then72:
+    %t151 = const i64 34
+    return %t151
+    jump endif74
+else73:
+    jump endif74
+endif74:
+    %t152 = load text
+    %t153 = const string "%"
+    %t154 = eq %t152, %t153
+    branch %t154 ? then75 : else76
+then75:
+    %t155 = const i64 35
+    return %t155
+    jump endif77
+else76:
+    jump endif77
+endif77:
+    %t156 = load text
+    %t157 = const string "!"
+    %t158 = eq %t156, %t157
+    branch %t158 ? then78 : else79
+then78:
+    %t159 = const i64 36
+    return %t159
+    jump endif80
+else79:
+    jump endif80
+endif80:
+    %t160 = load text
+    %t161 = const string "=="
+    %t162 = eq %t160, %t161
+    branch %t162 ? then81 : else82
+then81:
+    %t163 = const i64 37
+    return %t163
+    jump endif83
+else82:
+    jump endif83
+endif83:
+    %t164 = load text
+    %t165 = const string "!="
+    %t166 = eq %t164, %t165
+    branch %t166 ? then84 : else85
+then84:
+    %t167 = const i64 38
+    return %t167
+    jump endif86
+else85:
+    jump endif86
+endif86:
+    %t168 = load text
+    %t169 = const string "<"
+    %t170 = eq %t168, %t169
+    branch %t170 ? then87 : else88
+then87:
+    %t171 = const i64 39
+    return %t171
+    jump endif89
+else88:
+    jump endif89
+endif89:
+    %t172 = load text
+    %t173 = const string "<="
+    %t174 = eq %t172, %t173
+    branch %t174 ? then90 : else91
+then90:
+    %t175 = const i64 40
+    return %t175
+    jump endif92
+else91:
+    jump endif92
+endif92:
+    %t176 = load text
+    %t177 = const string ">"
+    %t178 = eq %t176, %t177
+    branch %t178 ? then93 : else94
+then93:
+    %t179 = const i64 41
+    return %t179
+    jump endif95
+else94:
+    jump endif95
+endif95:
+    %t180 = load text
+    %t181 = const string ">="
+    %t182 = eq %t180, %t181
+    branch %t182 ? then96 : else97
+then96:
+    %t183 = const i64 42
+    return %t183
+    jump endif98
+else97:
+    jump endif98
+endif98:
+    %t184 = load text
+    %t185 = const string "&&"
+    %t186 = eq %t184, %t185
+    branch %t186 ? then99 : else100
+then99:
+    %t187 = const i64 43
+    return %t187
+    jump endif101
+else100:
+    jump endif101
+endif101:
+    %t188 = load text
+    %t189 = const string "||"
+    %t190 = eq %t188, %t189
+    branch %t190 ? then102 : else103
+then102:
+    %t191 = const i64 44
+    return %t191
+    jump endif104
+else103:
+    jump endif104
+endif104:
+    %t192 = load text
+    %t193 = const string "->"
+    %t194 = eq %t192, %t193
+    branch %t194 ? then105 : else106
+then105:
+    %t195 = const i64 45
+    return %t195
+    jump endif107
+else106:
+    jump endif107
+endif107:
+    %t196 = const i64 99
+    return %t196
+endfunction
+function lex(string source) -> List<Token>
+entry:
+    %t197 = list()
+    local List<Token> out
+    store out, %t197
+    %t198 = const i64 0
+    local i64 i
+    store i, %t198
+    %t199 = load source
+    %t200 = call length(%t199)
+    local i64 n
+    store n, %t200
+    jump while108
+while108:
+    %t201 = load i
+    %t202 = load n
+    %t203 = lt %t201, %t202
+    branch %t203 ? while_body109 : while_end110
+while_body109:
+    %t204 = load source
+    %t205 = load i
+    %t206 = index %t204[%t205]
+    local i64 c
+    store c, %t206
+    %t207 = load c
+    %t208 = call isSpace(%t207)
+    branch %t208 ? then111 : else112
+then111:
+    %t209 = load i
+    %t210 = const i64 1
+    %t211 = add %t209, %t210
+    store i, %t211
+    jump endif113
+else112:
+    %t212 = load c
+    %t213 = const i64 47
+    %t214 = eq %t212, %t213
+    %t215 = load i
+    %t216 = const i64 1
+    %t217 = add %t215, %t216
+    %t218 = load n
+    %t219 = lt %t217, %t218
+    %t220 = and %t214, %t219
+    %t221 = load source
+    %t222 = load i
+    %t223 = const i64 1
+    %t224 = add %t222, %t223
+    %t225 = index %t221[%t224]
+    %t226 = const i64 47
+    %t227 = eq %t225, %t226
+    %t228 = and %t220, %t227
+    branch %t228 ? then114 : else115
+then114:
+    %t229 = load i
+    %t230 = const i64 2
+    %t231 = add %t229, %t230
+    store i, %t231
+    jump while117
+while117:
+    %t232 = load i
+    %t233 = load n
+    %t234 = lt %t232, %t233
+    %t235 = load source
+    %t236 = load i
+    %t237 = index %t235[%t236]
+    %t238 = const i64 10
+    %t239 = ne %t237, %t238
+    %t240 = and %t234, %t239
+    branch %t240 ? while_body118 : while_end119
+while_body118:
+    %t241 = load i
+    %t242 = const i64 1
+    %t243 = add %t241, %t242
+    store i, %t243
+    jump while117
+while_end119:
+    jump endif116
+else115:
+    %t244 = load c
+    %t245 = const i64 47
+    %t246 = eq %t244, %t245
+    %t247 = load i
+    %t248 = const i64 1
+    %t249 = add %t247, %t248
+    %t250 = load n
+    %t251 = lt %t249, %t250
+    %t252 = and %t246, %t251
+    %t253 = load source
+    %t254 = load i
+    %t255 = const i64 1
+    %t256 = add %t254, %t255
+    %t257 = index %t253[%t256]
+    %t258 = const i64 42
+    %t259 = eq %t257, %t258
+    %t260 = and %t252, %t259
+    branch %t260 ? then120 : else121
+then120:
+    %t261 = load i
+    %t262 = const i64 2
+    %t263 = add %t261, %t262
+    store i, %t263
+    jump while123
+while123:
+    %t264 = load i
+    %t265 = const i64 1
+    %t266 = add %t264, %t265
+    %t267 = load n
+    %t268 = lt %t266, %t267
+    %t269 = load source
+    %t270 = load i
+    %t271 = index %t269[%t270]
+    %t272 = const i64 42
+    %t273 = eq %t271, %t272
+    %t274 = load source
+    %t275 = load i
+    %t276 = const i64 1
+    %t277 = add %t275, %t276
+    %t278 = index %t274[%t277]
+    %t279 = const i64 47
+    %t280 = eq %t278, %t279
+    %t281 = and %t273, %t280
+    %t282 = not %t281
+    %t283 = and %t268, %t282
+    branch %t283 ? while_body124 : while_end125
+while_body124:
+    %t284 = load i
+    %t285 = const i64 1
+    %t286 = add %t284, %t285
+    store i, %t286
+    jump while123
+while_end125:
+    %t287 = load i
+    %t288 = const i64 1
+    %t289 = add %t287, %t288
+    %t290 = load n
+    %t291 = lt %t289, %t290
+    branch %t291 ? then126 : else127
+then126:
+    %t292 = load i
+    %t293 = const i64 2
+    %t294 = add %t292, %t293
+    store i, %t294
+    jump endif128
+else127:
+    jump endif128
+endif128:
+    jump endif122
+else121:
+    %t295 = load c
+    %t296 = call isDigit(%t295)
+    branch %t296 ? then129 : else130
+then129:
+    %t297 = load i
+    local i64 start
+    store start, %t297
+    %t298 = load i
+    %t299 = const i64 1
+    %t300 = add %t298, %t299
+    store i, %t300
+    jump while132
+while132:
+    %t301 = load i
+    %t302 = load n
+    %t303 = lt %t301, %t302
+    %t304 = load source
+    %t305 = load i
+    %t306 = index %t304[%t305]
+    %t307 = call isDigit(%t306)
+    %t308 = and %t303, %t307
+    branch %t308 ? while_body133 : while_end134
+while_body133:
+    %t309 = load i
+    %t310 = const i64 1
+    %t311 = add %t309, %t310
+    store i, %t311
+    jump while132
+while_end134:
+    %t312 = load i
+    %t313 = load n
+    %t314 = lt %t312, %t313
+    %t315 = load source
+    %t316 = load i
+    %t317 = index %t315[%t316]
+    %t318 = const i64 46
+    %t319 = eq %t317, %t318
+    %t320 = and %t314, %t319
+    %t321 = load i
+    %t322 = const i64 1
+    %t323 = add %t321, %t322
+    %t324 = load n
+    %t325 = lt %t323, %t324
+    %t326 = and %t320, %t325
+    %t327 = load source
+    %t328 = load i
+    %t329 = const i64 1
+    %t330 = add %t328, %t329
+    %t331 = index %t327[%t330]
+    %t332 = call isDigit(%t331)
+    %t333 = and %t326, %t332
+    branch %t333 ? then135 : else136
+then135:
+    %t334 = load i
+    %t335 = const i64 1
+    %t336 = add %t334, %t335
+    store i, %t336
+    jump while138
+while138:
+    %t337 = load i
+    %t338 = load n
+    %t339 = lt %t337, %t338
+    %t340 = load source
+    %t341 = load i
+    %t342 = index %t340[%t341]
+    %t343 = call isDigit(%t342)
+    %t344 = and %t339, %t343
+    branch %t344 ? while_body139 : while_end140
+while_body139:
+    %t345 = load i
+    %t346 = const i64 1
+    %t347 = add %t345, %t346
+    store i, %t347
+    jump while138
+while_end140:
+    jump endif137
+else136:
+    jump endif137
+endif137:
+    %t348 = ref out
+    %t349 = const i64 2
+    %t350 = load source
+    %t351 = load start
+    %t352 = load i
+    %t353 = call slice(%t350, %t351, %t352)
+    %t354 = load start
+    %t355 = call tokenValue(%t349, %t353, %t354)
+    call push(%t348, %t355)
+    jump endif131
+else130:
+    %t356 = load c
+    %t357 = call isAlpha(%t356)
+    branch %t357 ? then141 : else142
+then141:
+    %t358 = load i
+    local i64 start
+    store start, %t358
+    %t359 = load i
+    %t360 = const i64 1
+    %t361 = add %t359, %t360
+    store i, %t361
+    jump while144
+while144:
+    %t362 = load i
+    %t363 = load n
+    %t364 = lt %t362, %t363
+    %t365 = load source
+    %t366 = load i
+    %t367 = index %t365[%t366]
+    %t368 = call isAlphaNum(%t367)
+    %t369 = and %t364, %t368
+    branch %t369 ? while_body145 : while_end146
+while_body145:
+    %t370 = load i
+    %t371 = const i64 1
+    %t372 = add %t370, %t371
+    store i, %t372
+    jump while144
+while_end146:
+    %t373 = load source
+    %t374 = load start
+    %t375 = load i
+    %t376 = call slice(%t373, %t374, %t375)
+    local string word
+    store word, %t376
+    %t377 = ref out
+    %t378 = load word
+    %t379 = call keywordKind(%t378)
+    %t380 = load word
+    %t381 = load start
+    %t382 = call tokenValue(%t379, %t380, %t381)
+    call push(%t377, %t382)
+    jump endif143
+else142:
+    %t383 = load c
+    %t384 = const i64 34
+    %t385 = eq %t383, %t384
+    branch %t385 ? then147 : else148
+then147:
+    %t386 = load i
+    local i64 start
+    store start, %t386
+    %t387 = load i
+    %t388 = const i64 1
+    %t389 = add %t387, %t388
+    store i, %t389
+    %t390 = const string ""
+    local string value
+    store value, %t390
+    jump while150
+while150:
+    %t391 = load i
+    %t392 = load n
+    %t393 = lt %t391, %t392
+    %t394 = load source
+    %t395 = load i
+    %t396 = index %t394[%t395]
+    %t397 = const i64 34
+    %t398 = ne %t396, %t397
+    %t399 = and %t393, %t398
+    branch %t399 ? while_body151 : while_end152
+while_body151:
+    %t400 = load source
+    %t401 = load i
+    %t402 = index %t400[%t401]
+    %t403 = const i64 92
+    %t404 = eq %t402, %t403
+    %t405 = load i
+    %t406 = const i64 1
+    %t407 = add %t405, %t406
+    %t408 = load n
+    %t409 = lt %t407, %t408
+    %t410 = and %t404, %t409
+    branch %t410 ? then153 : else154
+then153:
+    %t411 = load i
+    %t412 = const i64 1
+    %t413 = add %t411, %t412
+    store i, %t413
+    %t414 = load source
+    %t415 = load i
+    %t416 = index %t414[%t415]
+    %t417 = const i64 110
+    %t418 = eq %t416, %t417
+    branch %t418 ? then156 : else157
+then156:
+    %t419 = load value
+    %t420 = const string "\n"
+    %t421 = add %t419, %t420
+    store value, %t421
+    jump endif158
+else157:
+    %t422 = load source
+    %t423 = load i
+    %t424 = index %t422[%t423]
+    %t425 = const i64 116
+    %t426 = eq %t424, %t425
+    branch %t426 ? then159 : else160
+then159:
+    %t427 = load value
+    %t428 = const string "\t"
+    %t429 = add %t427, %t428
+    store value, %t429
+    jump endif161
+else160:
+    %t430 = load source
+    %t431 = load i
+    %t432 = index %t430[%t431]
+    %t433 = const i64 114
+    %t434 = eq %t432, %t433
+    branch %t434 ? then162 : else163
+then162:
+    %t435 = load value
+    %t436 = const string "\r"
+    %t437 = add %t435, %t436
+    store value, %t437
+    jump endif164
+else163:
+    %t438 = load value
+    %t439 = load source
+    %t440 = load i
+    %t441 = load i
+    %t442 = const i64 1
+    %t443 = add %t441, %t442
+    %t444 = call slice(%t439, %t440, %t443)
+    %t445 = add %t438, %t444
+    store value, %t445
+    jump endif164
+endif164:
+    jump endif161
+endif161:
+    jump endif158
+endif158:
+    %t446 = load i
+    %t447 = const i64 1
+    %t448 = add %t446, %t447
+    store i, %t448
+    jump endif155
+else154:
+    %t449 = load value
+    %t450 = load source
+    %t451 = load i
+    %t452 = load i
+    %t453 = const i64 1
+    %t454 = add %t452, %t453
+    %t455 = call slice(%t450, %t451, %t454)
+    %t456 = add %t449, %t455
+    store value, %t456
+    %t457 = load i
+    %t458 = const i64 1
+    %t459 = add %t457, %t458
+    store i, %t459
+    jump endif155
+endif155:
+    jump while150
+while_end152:
+    %t460 = load i
+    %t461 = load n
+    %t462 = lt %t460, %t461
+    branch %t462 ? then165 : else166
+then165:
+    %t463 = load i
+    %t464 = const i64 1
+    %t465 = add %t463, %t464
+    store i, %t465
+    jump endif167
+else166:
+    jump endif167
+endif167:
+    %t466 = ref out
+    %t467 = const i64 3
+    %t468 = load value
+    %t469 = load start
+    %t470 = call tokenValue(%t467, %t468, %t469)
+    call push(%t466, %t470)
+    jump endif149
+else148:
+    %t471 = load c
+    %t472 = const i64 39
+    %t473 = eq %t471, %t472
+    branch %t473 ? then168 : else169
+then168:
+    %t474 = load i
+    local i64 start
+    store start, %t474
+    %t475 = load i
+    %t476 = const i64 1
+    %t477 = add %t475, %t476
+    store i, %t477
+    %t478 = const i64 0
+    local i64 code
+    store code, %t478
+    %t479 = load i
+    %t480 = load n
+    %t481 = lt %t479, %t480
+    %t482 = load source
+    %t483 = load i
+    %t484 = index %t482[%t483]
+    %t485 = const i64 92
+    %t486 = eq %t484, %t485
+    %t487 = and %t481, %t486
+    %t488 = load i
+    %t489 = const i64 1
+    %t490 = add %t488, %t489
+    %t491 = load n
+    %t492 = lt %t490, %t491
+    %t493 = and %t487, %t492
+    branch %t493 ? then171 : else172
+then171:
+    %t494 = load i
+    %t495 = const i64 1
+    %t496 = add %t494, %t495
+    store i, %t496
+    %t497 = load source
+    %t498 = load i
+    %t499 = index %t497[%t498]
+    %t500 = const i64 110
+    %t501 = eq %t499, %t500
+    branch %t501 ? then174 : else175
+then174:
+    %t502 = const i64 10
+    store code, %t502
+    jump endif176
+else175:
+    %t503 = load source
+    %t504 = load i
+    %t505 = index %t503[%t504]
+    %t506 = const i64 116
+    %t507 = eq %t505, %t506
+    branch %t507 ? then177 : else178
+then177:
+    %t508 = const i64 9
+    store code, %t508
+    jump endif179
+else178:
+    %t509 = load source
+    %t510 = load i
+    %t511 = index %t509[%t510]
+    %t512 = const i64 114
+    %t513 = eq %t511, %t512
+    branch %t513 ? then180 : else181
+then180:
+    %t514 = const i64 13
+    store code, %t514
+    jump endif182
+else181:
+    %t515 = load source
+    %t516 = load i
+    %t517 = index %t515[%t516]
+    store code, %t517
+    jump endif182
+endif182:
+    jump endif179
+endif179:
+    jump endif176
+endif176:
+    %t518 = load i
+    %t519 = const i64 1
+    %t520 = add %t518, %t519
+    store i, %t520
+    jump endif173
+else172:
+    %t521 = load i
+    %t522 = load n
+    %t523 = lt %t521, %t522
+    branch %t523 ? then183 : else184
+then183:
+    %t524 = load source
+    %t525 = load i
+    %t526 = index %t524[%t525]
+    store code, %t526
+    %t527 = load i
+    %t528 = const i64 1
+    %t529 = add %t527, %t528
+    store i, %t529
+    jump endif185
+else184:
+    jump endif185
+endif185:
+    jump endif173
+endif173:
+    %t530 = load i
+    %t531 = load n
+    %t532 = lt %t530, %t531
+    %t533 = load source
+    %t534 = load i
+    %t535 = index %t533[%t534]
+    %t536 = const i64 39
+    %t537 = eq %t535, %t536
+    %t538 = and %t532, %t537
+    branch %t538 ? then186 : else187
+then186:
+    %t539 = load i
+    %t540 = const i64 1
+    %t541 = add %t539, %t540
+    store i, %t541
+    jump endif188
+else187:
+    jump endif188
+endif188:
+    %t542 = ref out
+    %t543 = const i64 4
+    %t544 = load code
+    %t545 = call int_to_string(%t544)
+    %t546 = load start
+    %t547 = call tokenValue(%t543, %t545, %t546)
+    call push(%t542, %t547)
+    jump endif170
+else169:
+    %t548 = const string ""
+    local string two
+    store two, %t548
+    %t549 = load i
+    %t550 = const i64 1
+    %t551 = add %t549, %t550
+    %t552 = load n
+    %t553 = lt %t551, %t552
+    branch %t553 ? then189 : else190
+then189:
+    %t554 = load source
+    %t555 = load i
+    %t556 = load i
+    %t557 = const i64 2
+    %t558 = add %t556, %t557
+    %t559 = call slice(%t554, %t555, %t558)
+    store two, %t559
+    jump endif191
+else190:
+    jump endif191
+endif191:
+    %t560 = load two
+    %t561 = const string "=="
+    %t562 = eq %t560, %t561
+    %t563 = load two
+    %t564 = const string "!="
+    %t565 = eq %t563, %t564
+    %t566 = or %t562, %t565
+    %t567 = load two
+    %t568 = const string "<="
+    %t569 = eq %t567, %t568
+    %t570 = or %t566, %t569
+    %t571 = load two
+    %t572 = const string ">="
+    %t573 = eq %t571, %t572
+    %t574 = or %t570, %t573
+    %t575 = load two
+    %t576 = const string "&&"
+    %t577 = eq %t575, %t576
+    %t578 = or %t574, %t577
+    %t579 = load two
+    %t580 = const string "||"
+    %t581 = eq %t579, %t580
+    %t582 = or %t578, %t581
+    %t583 = load two
+    %t584 = const string "->"
+    %t585 = eq %t583, %t584
+    %t586 = or %t582, %t585
+    branch %t586 ? then192 : else193
+then192:
+    %t587 = ref out
+    %t588 = load two
+    %t589 = call operatorKind(%t588)
+    %t590 = load two
+    %t591 = load i
+    %t592 = call tokenValue(%t589, %t590, %t591)
+    call push(%t587, %t592)
+    %t593 = load i
+    %t594 = const i64 2
+    %t595 = add %t593, %t594
+    store i, %t595
+    jump endif194
+else193:
+    %t596 = load source
+    %t597 = load i
+    %t598 = load i
+    %t599 = const i64 1
+    %t600 = add %t598, %t599
+    %t601 = call slice(%t596, %t597, %t600)
+    local string one
+    store one, %t601
+    %t602 = ref out
+    %t603 = load one
+    %t604 = call operatorKind(%t603)
+    %t605 = load one
+    %t606 = load i
+    %t607 = call tokenValue(%t604, %t605, %t606)
+    call push(%t602, %t607)
+    %t608 = load i
+    %t609 = const i64 1
+    %t610 = add %t608, %t609
+    store i, %t610
+    jump endif194
+endif194:
+    jump endif170
+endif170:
+    jump endif149
+endif149:
+    jump endif143
+endif143:
+    jump endif131
+endif131:
+    jump endif122
+endif122:
+    jump endif116
+endif116:
+    jump endif113
+endif113:
+    jump while108
+while_end110:
+    %t611 = ref out
+    %t612 = const i64 0
+    %t613 = const string ""
+    %t614 = load n
+    %t615 = call tokenValue(%t612, %t613, %t614)
+    call push(%t611, %t615)
+    %t616 = load out
+    return %t616
+endfunction
+function current(Ref<ParserState> state) -> Token
+entry:
+    %t617 = load state
+    %t618 = field %t617.tokens
+    %t619 = load state
+    %t620 = field %t619.pos
+    %t621 = index %t618[%t620]
+    return %t621
+endfunction
+function take(Ref<ParserState> state, i64 kind) -> Token
+entry:
+    %t622 = load state
+    %t623 = field %t622.tokens
+    %t624 = load state
+    %t625 = field %t624.pos
+    %t626 = index %t623[%t625]
+    local Token t
+    store t, %t626
+    %t627 = load state
+    %t628 = field %t627.pos
+    %t629 = const i64 1
+    %t630 = add %t628, %t629
+    field_set state.pos = %t630
+    %t631 = load t
+    %t632 = field %t631.kind
+    %t633 = load kind
+    %t634 = ne %t632, %t633
+    branch %t634 ? then195 : else196
+then195:
+    %t635 = load t
+    return %t635
+    jump endif197
+else196:
+    jump endif197
+endif197:
+    %t636 = load t
+    return %t636
+endfunction
+function maybe(Ref<ParserState> state, i64 kind) -> bool
+entry:
+    %t637 = load state
+    %t638 = field %t637.tokens
+    %t639 = load state
+    %t640 = field %t639.pos
+    %t641 = index %t638[%t640]
+    local Token t
+    store t, %t641
+    %t642 = load t
+    %t643 = field %t642.kind
+    %t644 = load kind
+    %t645 = eq %t643, %t644
+    branch %t645 ? then198 : else199
+then198:
+    %t646 = load state
+    %t647 = field %t646.pos
+    %t648 = const i64 1
+    %t649 = add %t647, %t648
+    field_set state.pos = %t649
+    %t650 = const bool true
+    return %t650
+    jump endif200
+else199:
+    jump endif200
+endif200:
+    %t651 = const bool false
+    return %t651
+endfunction
+function emptyExpr(i64 kind) -> Expr
+entry:
+    %t652 = new Expr
+    local Expr e
+    store e, %t652
+    %t653 = load kind
+    field_set e.kind = %t653
+    %t654 = const i64 1
+    %t655 = neg %t654
+    field_set e.left = %t655
+    %t656 = const i64 1
+    %t657 = neg %t656
+    field_set e.right = %t657
+    %t658 = const string ""
+    field_set e.valueText = %t658
+    %t659 = list()
+    field_set e.args = %t659
+    %t660 = load e
+    return %t660
+endfunction
+function emptyStmt(i64 kind) -> Stmt
+entry:
+    %t661 = new Stmt
+    local Stmt s
+    store s, %t661
+    %t662 = load kind
+    field_set s.kind = %t662
+    %t663 = const i64 1
+    %t664 = neg %t663
+    field_set s.expr = %t664
+    %t665 = const i64 1
+    %t666 = neg %t665
+    field_set s.left = %t666
+    %t667 = const i64 1
+    %t668 = neg %t667
+    field_set s.right = %t668
+    %t669 = list()
+    field_set s.thenStmts = %t669
+    %t670 = list()
+    field_set s.elseStmts = %t670
+    %t671 = list()
+    field_set s.body = %t671
+    %t672 = load s
+    return %t672
+endfunction
+function addExpr(Ref<ParserState> state, Expr e) -> i64
+entry:
+    %t673 = load state
+    %t674 = field %t673.exprs
+    %t675 = call listLength(%t674)
+    local i64 id
+    store id, %t675
+    %t676 = ref state
+    %t677 = ref_field %t676.exprs
+    %t678 = load e
+    call push(%t677, %t678)
+    %t679 = load id
+    return %t679
+endfunction
+function addStmt(Ref<ParserState> state, Stmt s) -> i64
+entry:
+    %t680 = load state
+    %t681 = field %t680.stmts
+    %t682 = call listLength(%t681)
+    local i64 id
+    store id, %t682
+    %t683 = ref state
+    %t684 = ref_field %t683.stmts
+    %t685 = load s
+    call push(%t684, %t685)
+    %t686 = load id
+    return %t686
+endfunction
+function precedence(i64 kind) -> i64
+entry:
+    %t687 = load kind
+    %t688 = const i64 44
+    %t689 = eq %t687, %t688
+    branch %t689 ? then201 : else202
+then201:
+    %t690 = const i64 10
+    return %t690
+    jump endif203
+else202:
+    jump endif203
+endif203:
+    %t691 = load kind
+    %t692 = const i64 43
+    %t693 = eq %t691, %t692
+    branch %t693 ? then204 : else205
+then204:
+    %t694 = const i64 20
+    return %t694
+    jump endif206
+else205:
+    jump endif206
+endif206:
+    %t695 = load kind
+    %t696 = const i64 37
+    %t697 = eq %t695, %t696
+    %t698 = load kind
+    %t699 = const i64 38
+    %t700 = eq %t698, %t699
+    %t701 = or %t697, %t700
+    branch %t701 ? then207 : else208
+then207:
+    %t702 = const i64 30
+    return %t702
+    jump endif209
+else208:
+    jump endif209
+endif209:
+    %t703 = load kind
+    %t704 = const i64 39
+    %t705 = eq %t703, %t704
+    %t706 = load kind
+    %t707 = const i64 40
+    %t708 = eq %t706, %t707
+    %t709 = or %t705, %t708
+    %t710 = load kind
+    %t711 = const i64 41
+    %t712 = eq %t710, %t711
+    %t713 = or %t709, %t712
+    %t714 = load kind
+    %t715 = const i64 42
+    %t716 = eq %t714, %t715
+    %t717 = or %t713, %t716
+    branch %t717 ? then210 : else211
+then210:
+    %t718 = const i64 40
+    return %t718
+    jump endif212
+else211:
+    jump endif212
+endif212:
+    %t719 = load kind
+    %t720 = const i64 31
+    %t721 = eq %t719, %t720
+    %t722 = load kind
+    %t723 = const i64 32
+    %t724 = eq %t722, %t723
+    %t725 = or %t721, %t724
+    branch %t725 ? then213 : else214
+then213:
+    %t726 = const i64 50
+    return %t726
+    jump endif215
+else214:
+    jump endif215
+endif215:
+    %t727 = load kind
+    %t728 = const i64 33
+    %t729 = eq %t727, %t728
+    %t730 = load kind
+    %t731 = const i64 34
+    %t732 = eq %t730, %t731
+    %t733 = or %t729, %t732
+    %t734 = load kind
+    %t735 = const i64 35
+    %t736 = eq %t734, %t735
+    %t737 = or %t733, %t736
+    branch %t737 ? then216 : else217
+then216:
+    %t738 = const i64 60
+    return %t738
+    jump endif218
+else217:
+    jump endif218
+endif218:
+    %t739 = const i64 1
+    %t740 = neg %t739
+    return %t740
+endfunction
+function parseType(Ref<ParserState> state) -> string
+entry:
+    %t741 = ref state
+    %t742 = const i64 1
+    %t743 = call take(%t741, %t742)
+    local Token t
+    store t, %t743
+    %t744 = load t
+    %t745 = field %t744.text
+    local string out
+    store out, %t745
+    %t746 = ref state
+    %t747 = call current(%t746)
+    %t748 = field %t747.kind
+    %t749 = const i64 39
+    %t750 = eq %t748, %t749
+    branch %t750 ? then219 : else220
+then219:
+    %t751 = ref state
+    %t752 = const i64 39
+    %t753 = call take(%t751, %t752)
+    %t754 = ref state
+    %t755 = call parseType(%t754)
+    local string inner
+    store inner, %t755
+    %t756 = load out
+    %t757 = const string "<"
+    %t758 = add %t756, %t757
+    %t759 = load inner
+    %t760 = add %t758, %t759
+    store out, %t760
+    jump while222
+while222:
+    %t761 = ref state
+    %t762 = call current(%t761)
+    %t763 = field %t762.kind
+    %t764 = const i64 26
+    %t765 = eq %t763, %t764
+    branch %t765 ? while_body223 : while_end224
+while_body223:
+    %t766 = ref state
+    %t767 = const i64 26
+    %t768 = call take(%t766, %t767)
+    %t769 = ref state
+    %t770 = call parseType(%t769)
+    local string arg
+    store arg, %t770
+    %t771 = load out
+    %t772 = const string ","
+    %t773 = add %t771, %t772
+    %t774 = load arg
+    %t775 = add %t773, %t774
+    store out, %t775
+    jump while222
+while_end224:
+    %t776 = ref state
+    %t777 = const i64 41
+    %t778 = call maybe(%t776, %t777)
+    %t779 = load out
+    %t780 = const string ">"
+    %t781 = add %t779, %t780
+    store out, %t781
+    jump endif221
+else220:
+    jump endif221
+endif221:
+    %t782 = load out
+    return %t782
+endfunction
+function parseExpression(Ref<ParserState> state, i64 minPrec) -> i64
+entry:
+    %t783 = ref state
+    %t784 = call parseUnary(%t783)
+    local i64 left
+    store left, %t784
+    %t785 = ref state
+    %t786 = call current(%t785)
+    %t787 = field %t786.kind
+    %t788 = call precedence(%t787)
+    local i64 p
+    store p, %t788
+    jump while225
+while225:
+    %t789 = load p
+    %t790 = load minPrec
+    %t791 = ge %t789, %t790
+    branch %t791 ? while_body226 : while_end227
+while_body226:
+    %t792 = ref state
+    %t793 = call current(%t792)
+    %t794 = field %t793.text
+    local string op
+    store op, %t794
+    %t795 = ref state
+    %t796 = ref state
+    %t797 = call current(%t796)
+    %t798 = field %t797.kind
+    %t799 = call take(%t795, %t798)
+    %t800 = ref state
+    %t801 = load p
+    %t802 = const i64 1
+    %t803 = add %t801, %t802
+    %t804 = call parseExpression(%t800, %t803)
+    local i64 right
+    store right, %t804
+    %t805 = const i64 6
+    %t806 = call emptyExpr(%t805)
+    local Expr e
+    store e, %t806
+    %t807 = load op
+    field_set e.op = %t807
+    %t808 = load left
+    field_set e.left = %t808
+    %t809 = load right
+    field_set e.right = %t809
+    %t810 = ref state
+    %t811 = load e
+    %t812 = call addExpr(%t810, %t811)
+    store left, %t812
+    %t813 = ref state
+    %t814 = call current(%t813)
+    %t815 = field %t814.kind
+    %t816 = call precedence(%t815)
+    store p, %t816
+    jump while225
+while_end227:
+    %t817 = load left
+    return %t817
+endfunction
+function parseCallArgs(Ref<ParserState> state) -> List<i64>
+entry:
+    %t818 = list()
+    local List<i64> args
+    store args, %t818
+    %t819 = ref state
+    %t820 = call current(%t819)
+    %t821 = field %t820.kind
+    %t822 = const i64 21
+    %t823 = ne %t821, %t822
+    branch %t823 ? then228 : else229
+then228:
+    %t824 = ref args
+    %t825 = ref state
+    %t826 = const i64 0
+    %t827 = call parseExpression(%t825, %t826)
+    call push(%t824, %t827)
+    jump while231
+while231:
+    %t828 = ref state
+    %t829 = call current(%t828)
+    %t830 = field %t829.kind
+    %t831 = const i64 26
+    %t832 = eq %t830, %t831
+    branch %t832 ? while_body232 : while_end233
+while_body232:
+    %t833 = ref state
+    %t834 = const i64 26
+    %t835 = call take(%t833, %t834)
+    %t836 = ref args
+    %t837 = ref state
+    %t838 = const i64 0
+    %t839 = call parseExpression(%t837, %t838)
+    call push(%t836, %t839)
+    jump while231
+while_end233:
+    jump endif230
+else229:
+    jump endif230
+endif230:
+    %t840 = ref state
+    %t841 = const i64 21
+    %t842 = call maybe(%t840, %t841)
+    %t843 = load args
+    return %t843
+endfunction
+function parsePrimary(Ref<ParserState> state) -> i64
+entry:
+    %t844 = ref state
+    %t845 = call current(%t844)
+    local Token t
+    store t, %t845
+    %t846 = load t
+    %t847 = field %t846.kind
+    %t848 = const i64 2
+    %t849 = eq %t847, %t848
+    branch %t849 ? then234 : else235
+then234:
+    %t850 = ref state
+    %t851 = const i64 2
+    %t852 = call take(%t850, %t851)
+    %t853 = const i64 1
+    %t854 = call emptyExpr(%t853)
+    local Expr e
+    store e, %t854
+    %t855 = load t
+    %t856 = field %t855.text
+    field_set e.text = %t856
+    %t857 = load t
+    %t858 = field %t857.text
+    field_set e.valueText = %t858
+    %t859 = ref state
+    %t860 = load e
+    %t861 = call addExpr(%t859, %t860)
+    return %t861
+    jump endif236
+else235:
+    jump endif236
+endif236:
+    %t862 = load t
+    %t863 = field %t862.kind
+    %t864 = const i64 3
+    %t865 = eq %t863, %t864
+    branch %t865 ? then237 : else238
+then237:
+    %t866 = ref state
+    %t867 = const i64 3
+    %t868 = call take(%t866, %t867)
+    %t869 = const i64 2
+    %t870 = call emptyExpr(%t869)
+    local Expr e
+    store e, %t870
+    %t871 = load t
+    %t872 = field %t871.text
+    field_set e.text = %t872
+    %t873 = ref state
+    %t874 = load e
+    %t875 = call addExpr(%t873, %t874)
+    return %t875
+    jump endif239
+else238:
+    jump endif239
+endif239:
+    %t876 = load t
+    %t877 = field %t876.kind
+    %t878 = const i64 4
+    %t879 = eq %t877, %t878
+    branch %t879 ? then240 : else241
+then240:
+    %t880 = ref state
+    %t881 = const i64 4
+    %t882 = call take(%t880, %t881)
+    %t883 = const i64 3
+    %t884 = call emptyExpr(%t883)
+    local Expr e
+    store e, %t884
+    %t885 = load t
+    %t886 = field %t885.text
+    field_set e.valueText = %t886
+    %t887 = ref state
+    %t888 = load e
+    %t889 = call addExpr(%t887, %t888)
+    return %t889
+    jump endif242
+else241:
+    jump endif242
+endif242:
+    %t890 = load t
+    %t891 = field %t890.kind
+    %t892 = const i64 17
+    %t893 = eq %t891, %t892
+    %t894 = load t
+    %t895 = field %t894.kind
+    %t896 = const i64 18
+    %t897 = eq %t895, %t896
+    %t898 = or %t893, %t897
+    branch %t898 ? then243 : else244
+then243:
+    %t899 = ref state
+    %t900 = load t
+    %t901 = field %t900.kind
+    %t902 = call take(%t899, %t901)
+    %t903 = const i64 4
+    %t904 = call emptyExpr(%t903)
+    local Expr e
+    store e, %t904
+    %t905 = load t
+    %t906 = field %t905.kind
+    %t907 = const i64 17
+    %t908 = eq %t906, %t907
+    branch %t908 ? then246 : else247
+then246:
+    %t909 = const string "true"
+    field_set e.valueText = %t909
+    jump endif248
+else247:
+    %t910 = const string "false"
+    field_set e.valueText = %t910
+    jump endif248
+endif248:
+    %t911 = ref state
+    %t912 = load e
+    %t913 = call addExpr(%t911, %t912)
+    return %t913
+    jump endif245
+else244:
+    jump endif245
+endif245:
+    %t914 = load t
+    %t915 = field %t914.kind
+    %t916 = const i64 1
+    %t917 = eq %t915, %t916
+    branch %t917 ? then249 : else250
+then249:
+    %t918 = ref state
+    %t919 = const i64 1
+    %t920 = call take(%t918, %t919)
+    %t921 = const i64 5
+    %t922 = call emptyExpr(%t921)
+    local Expr e
+    store e, %t922
+    %t923 = load t
+    %t924 = field %t923.text
+    field_set e.text = %t924
+    %t925 = ref state
+    %t926 = load e
+    %t927 = call addExpr(%t925, %t926)
+    return %t927
+    jump endif251
+else250:
+    jump endif251
+endif251:
+    %t928 = load t
+    %t929 = field %t928.kind
+    %t930 = const i64 19
+    %t931 = eq %t929, %t930
+    branch %t931 ? then252 : else253
+then252:
+    %t932 = ref state
+    %t933 = const i64 19
+    %t934 = call take(%t932, %t933)
+    %t935 = const i64 11
+    %t936 = call emptyExpr(%t935)
+    local Expr e
+    store e, %t936
+    %t937 = ref state
+    %t938 = call parseType(%t937)
+    field_set e.text = %t938
+    %t939 = ref state
+    %t940 = const i64 20
+    %t941 = call maybe(%t939, %t940)
+    %t942 = ref state
+    %t943 = call parseCallArgs(%t942)
+    field_set e.args = %t943
+    %t944 = ref state
+    %t945 = load e
+    %t946 = call addExpr(%t944, %t945)
+    return %t946
+    jump endif254
+else253:
+    jump endif254
+endif254:
+    %t947 = load t
+    %t948 = field %t947.kind
+    %t949 = const i64 28
+    %t950 = eq %t948, %t949
+    branch %t950 ? then255 : else256
+then255:
+    %t951 = ref state
+    %t952 = const i64 28
+    %t953 = call take(%t951, %t952)
+    %t954 = const i64 12
+    %t955 = call emptyExpr(%t954)
+    local Expr e
+    store e, %t955
+    %t956 = ref state
+    %t957 = call current(%t956)
+    %t958 = field %t957.kind
+    %t959 = const i64 29
+    %t960 = ne %t958, %t959
+    branch %t960 ? then258 : else259
+then258:
+    %t961 = ref e
+    %t962 = ref_field %t961.args
+    %t963 = ref state
+    %t964 = const i64 0
+    %t965 = call parseExpression(%t963, %t964)
+    call push(%t962, %t965)
+    jump while261
+while261:
+    %t966 = ref state
+    %t967 = call current(%t966)
+    %t968 = field %t967.kind
+    %t969 = const i64 26
+    %t970 = eq %t968, %t969
+    branch %t970 ? while_body262 : while_end263
+while_body262:
+    %t971 = ref state
+    %t972 = const i64 26
+    %t973 = call take(%t971, %t972)
+    %t974 = ref e
+    %t975 = ref_field %t974.args
+    %t976 = ref state
+    %t977 = const i64 0
+    %t978 = call parseExpression(%t976, %t977)
+    call push(%t975, %t978)
+    jump while261
+while_end263:
+    jump endif260
+else259:
+    jump endif260
+endif260:
+    %t979 = ref state
+    %t980 = const i64 29
+    %t981 = call maybe(%t979, %t980)
+    %t982 = ref state
+    %t983 = load e
+    %t984 = call addExpr(%t982, %t983)
+    return %t984
+    jump endif257
+else256:
+    jump endif257
+endif257:
+    %t985 = load t
+    %t986 = field %t985.kind
+    %t987 = const i64 20
+    %t988 = eq %t986, %t987
+    branch %t988 ? then264 : else265
+then264:
+    %t989 = ref state
+    %t990 = const i64 20
+    %t991 = call take(%t989, %t990)
+    %t992 = ref state
+    %t993 = const i64 0
+    %t994 = call parseExpression(%t992, %t993)
+    local i64 id
+    store id, %t994
+    %t995 = ref state
+    %t996 = const i64 21
+    %t997 = call maybe(%t995, %t996)
+    %t998 = load id
+    return %t998
+    jump endif266
+else265:
+    jump endif266
+endif266:
+    %t999 = const i64 1
+    %t1000 = neg %t999
+    return %t1000
+endfunction
+function parsePostfix(Ref<ParserState> state, i64 id) -> i64
+entry:
+    %t1001 = load id
+    local i64 out
+    store out, %t1001
+    %t1002 = const bool true
+    local bool more
+    store more, %t1002
+    jump while267
+while267:
+    %t1003 = load more
+    branch %t1003 ? while_body268 : while_end269
+while_body268:
+    %t1004 = ref state
+    %t1005 = call current(%t1004)
+    %t1006 = field %t1005.kind
+    %t1007 = const i64 20
+    %t1008 = eq %t1006, %t1007
+    branch %t1008 ? then270 : else271
+then270:
+    %t1009 = list()
+    local List<i64> args
+    store args, %t1009
+    %t1010 = ref state
+    %t1011 = const i64 20
+    %t1012 = call take(%t1010, %t1011)
+    %t1013 = ref state
+    %t1014 = call parseCallArgs(%t1013)
+    store args, %t1014
+    %t1015 = const i64 8
+    %t1016 = call emptyExpr(%t1015)
+    local Expr e
+    store e, %t1016
+    %t1017 = load out
+    field_set e.left = %t1017
+    %t1018 = load args
+    field_set e.args = %t1018
+    %t1019 = ref state
+    %t1020 = load e
+    %t1021 = call addExpr(%t1019, %t1020)
+    store out, %t1021
+    jump endif272
+else271:
+    %t1022 = ref state
+    %t1023 = call current(%t1022)
+    %t1024 = field %t1023.kind
+    %t1025 = const i64 27
+    %t1026 = eq %t1024, %t1025
+    branch %t1026 ? then273 : else274
+then273:
+    %t1027 = ref state
+    %t1028 = const i64 27
+    %t1029 = call take(%t1027, %t1028)
+    %t1030 = ref state
+    %t1031 = const i64 1
+    %t1032 = call take(%t1030, %t1031)
+    local Token member
+    store member, %t1032
+    %t1033 = const i64 9
+    %t1034 = call emptyExpr(%t1033)
+    local Expr e
+    store e, %t1034
+    %t1035 = load out
+    field_set e.left = %t1035
+    %t1036 = load member
+    %t1037 = field %t1036.text
+    field_set e.text = %t1037
+    %t1038 = ref state
+    %t1039 = load e
+    %t1040 = call addExpr(%t1038, %t1039)
+    store out, %t1040
+    jump endif275
+else274:
+    %t1041 = ref state
+    %t1042 = call current(%t1041)
+    %t1043 = field %t1042.kind
+    %t1044 = const i64 28
+    %t1045 = eq %t1043, %t1044
+    branch %t1045 ? then276 : else277
+then276:
+    %t1046 = ref state
+    %t1047 = const i64 28
+    %t1048 = call take(%t1046, %t1047)
+    %t1049 = ref state
+    %t1050 = const i64 0
+    %t1051 = call parseExpression(%t1049, %t1050)
+    local i64 idx
+    store idx, %t1051
+    %t1052 = ref state
+    %t1053 = const i64 29
+    %t1054 = call maybe(%t1052, %t1053)
+    %t1055 = const i64 10
+    %t1056 = call emptyExpr(%t1055)
+    local Expr e
+    store e, %t1056
+    %t1057 = load out
+    field_set e.left = %t1057
+    %t1058 = load idx
+    field_set e.right = %t1058
+    %t1059 = ref state
+    %t1060 = load e
+    %t1061 = call addExpr(%t1059, %t1060)
+    store out, %t1061
+    jump endif278
+else277:
+    %t1062 = const bool false
+    store more, %t1062
+    jump endif278
+endif278:
+    jump endif275
+endif275:
+    jump endif272
+endif272:
+    jump while267
+while_end269:
+    %t1063 = load out
+    return %t1063
+endfunction
+function parseUnary(Ref<ParserState> state) -> i64
+entry:
+    %t1064 = ref state
+    %t1065 = call current(%t1064)
+    %t1066 = field %t1065.kind
+    local i64 k
+    store k, %t1066
+    %t1067 = load k
+    %t1068 = const i64 36
+    %t1069 = eq %t1067, %t1068
+    %t1070 = load k
+    %t1071 = const i64 31
+    %t1072 = eq %t1070, %t1071
+    %t1073 = or %t1069, %t1072
+    %t1074 = load k
+    %t1075 = const i64 32
+    %t1076 = eq %t1074, %t1075
+    %t1077 = or %t1073, %t1076
+    branch %t1077 ? then279 : else280
+then279:
+    %t1078 = ref state
+    %t1079 = call current(%t1078)
+    %t1080 = field %t1079.text
+    local string op
+    store op, %t1080
+    %t1081 = ref state
+    %t1082 = load k
+    %t1083 = call take(%t1081, %t1082)
+    %t1084 = ref state
+    %t1085 = call parseUnary(%t1084)
+    local i64 operand
+    store operand, %t1085
+    %t1086 = const i64 7
+    %t1087 = call emptyExpr(%t1086)
+    local Expr e
+    store e, %t1087
+    %t1088 = load op
+    field_set e.op = %t1088
+    %t1089 = load operand
+    field_set e.left = %t1089
+    %t1090 = ref state
+    %t1091 = load e
+    %t1092 = call addExpr(%t1090, %t1091)
+    return %t1092
+    jump endif281
+else280:
+    jump endif281
+endif281:
+    %t1093 = ref state
+    %t1094 = call parsePrimary(%t1093)
+    local i64 id
+    store id, %t1094
+    %t1095 = load id
+    %t1096 = const i64 0
+    %t1097 = lt %t1095, %t1096
+    branch %t1097 ? then282 : else283
+then282:
+    %t1098 = load id
+    return %t1098
+    jump endif284
+else283:
+    jump endif284
+endif284:
+    %t1099 = ref state
+    %t1100 = load id
+    %t1101 = call parsePostfix(%t1099, %t1100)
+    return %t1101
+endfunction
+function parseBlock(Ref<ParserState> state) -> List<i64>
+entry:
+    %t1102 = list()
+    local List<i64> body
+    store body, %t1102
+    %t1103 = ref state
+    %t1104 = const i64 22
+    %t1105 = call maybe(%t1103, %t1104)
+    jump while285
+while285:
+    %t1106 = ref state
+    %t1107 = call current(%t1106)
+    %t1108 = field %t1107.kind
+    %t1109 = const i64 23
+    %t1110 = ne %t1108, %t1109
+    %t1111 = ref state
+    %t1112 = call current(%t1111)
+    %t1113 = field %t1112.kind
+    %t1114 = const i64 0
+    %t1115 = ne %t1113, %t1114
+    %t1116 = and %t1110, %t1115
+    branch %t1116 ? while_body286 : while_end287
+while_body286:
+    %t1117 = ref state
+    %t1118 = call parseStatement(%t1117)
+    local i64 stmtId
+    store stmtId, %t1118
+    %t1119 = load stmtId
+    %t1120 = const i64 0
+    %t1121 = ge %t1119, %t1120
+    branch %t1121 ? then288 : else289
+then288:
+    %t1122 = ref body
+    %t1123 = load stmtId
+    call push(%t1122, %t1123)
+    jump endif290
+else289:
+    jump endif290
+endif290:
+    jump while285
+while_end287:
+    %t1124 = ref state
+    %t1125 = const i64 23
+    %t1126 = call maybe(%t1124, %t1125)
+    %t1127 = load body
+    return %t1127
+endfunction
+function parseControlledBody(Ref<ParserState> state) -> List<i64>
+entry:
+    %t1128 = list()
+    local List<i64> body
+    store body, %t1128
+    %t1129 = ref state
+    %t1130 = call current(%t1129)
+    %t1131 = field %t1130.kind
+    %t1132 = const i64 22
+    %t1133 = eq %t1131, %t1132
+    branch %t1133 ? then291 : else292
+then291:
+    %t1134 = ref state
+    %t1135 = call parseBlock(%t1134)
+    return %t1135
+    jump endif293
+else292:
+    jump endif293
+endif293:
+    %t1136 = ref body
+    %t1137 = ref state
+    %t1138 = call parseStatement(%t1137)
+    call push(%t1136, %t1138)
+    %t1139 = load body
+    return %t1139
+endfunction
+function parseStatement(Ref<ParserState> state) -> i64
+entry:
+    %t1140 = ref state
+    %t1141 = call current(%t1140)
+    %t1142 = field %t1141.kind
+    local i64 k
+    store k, %t1142
+    %t1143 = load k
+    %t1144 = const i64 12
+    %t1145 = eq %t1143, %t1144
+    branch %t1145 ? then294 : else295
+then294:
+    %t1146 = ref state
+    %t1147 = const i64 12
+    %t1148 = call take(%t1146, %t1147)
+    %t1149 = const i64 1
+    %t1150 = call emptyStmt(%t1149)
+    local Stmt s
+    store s, %t1150
+    %t1151 = ref state
+    %t1152 = const i64 1
+    %t1153 = call take(%t1151, %t1152)
+    local Token name
+    store name, %t1153
+    %t1154 = load name
+    %t1155 = field %t1154.text
+    field_set s.name = %t1155
+    %t1156 = ref state
+    %t1157 = call current(%t1156)
+    %t1158 = field %t1157.kind
+    %t1159 = const i64 25
+    %t1160 = eq %t1158, %t1159
+    branch %t1160 ? then297 : else298
+then297:
+    %t1161 = ref state
+    %t1162 = const i64 25
+    %t1163 = call take(%t1161, %t1162)
+    %t1164 = ref state
+    %t1165 = call parseType(%t1164)
+    field_set s.type = %t1165
+    jump endif299
+else298:
+    jump endif299
+endif299:
+    %t1166 = ref state
+    %t1167 = const i64 30
+    %t1168 = call maybe(%t1166, %t1167)
+    %t1169 = ref state
+    %t1170 = const i64 0
+    %t1171 = call parseExpression(%t1169, %t1170)
+    field_set s.expr = %t1171
+    %t1172 = ref state
+    %t1173 = const i64 24
+    %t1174 = call maybe(%t1172, %t1173)
+    %t1175 = ref state
+    %t1176 = load s
+    %t1177 = call addStmt(%t1175, %t1176)
+    return %t1177
+    jump endif296
+else295:
+    jump endif296
+endif296:
+    %t1178 = load k
+    %t1179 = const i64 13
+    %t1180 = eq %t1178, %t1179
+    branch %t1180 ? then300 : else301
+then300:
+    %t1181 = ref state
+    %t1182 = const i64 13
+    %t1183 = call take(%t1181, %t1182)
+    %t1184 = const i64 2
+    %t1185 = call emptyStmt(%t1184)
+    local Stmt s
+    store s, %t1185
+    %t1186 = ref state
+    %t1187 = call current(%t1186)
+    %t1188 = field %t1187.kind
+    %t1189 = const i64 24
+    %t1190 = ne %t1188, %t1189
+    branch %t1190 ? then303 : else304
+then303:
+    %t1191 = ref state
+    %t1192 = const i64 0
+    %t1193 = call parseExpression(%t1191, %t1192)
+    field_set s.expr = %t1193
+    jump endif305
+else304:
+    jump endif305
+endif305:
+    %t1194 = ref state
+    %t1195 = const i64 24
+    %t1196 = call maybe(%t1194, %t1195)
+    %t1197 = ref state
+    %t1198 = load s
+    %t1199 = call addStmt(%t1197, %t1198)
+    return %t1199
+    jump endif302
+else301:
+    jump endif302
+endif302:
+    %t1200 = load k
+    %t1201 = const i64 14
+    %t1202 = eq %t1200, %t1201
+    branch %t1202 ? then306 : else307
+then306:
+    %t1203 = ref state
+    %t1204 = const i64 14
+    %t1205 = call take(%t1203, %t1204)
+    %t1206 = const i64 5
+    %t1207 = call emptyStmt(%t1206)
+    local Stmt s
+    store s, %t1207
+    %t1208 = ref state
+    %t1209 = const i64 20
+    %t1210 = call maybe(%t1208, %t1209)
+    %t1211 = ref state
+    %t1212 = const i64 0
+    %t1213 = call parseExpression(%t1211, %t1212)
+    field_set s.expr = %t1213
+    %t1214 = ref state
+    %t1215 = const i64 21
+    %t1216 = call maybe(%t1214, %t1215)
+    %t1217 = ref state
+    %t1218 = call parseControlledBody(%t1217)
+    field_set s.thenStmts = %t1218
+    %t1219 = ref state
+    %t1220 = call current(%t1219)
+    %t1221 = field %t1220.kind
+    %t1222 = const i64 15
+    %t1223 = eq %t1221, %t1222
+    branch %t1223 ? then309 : else310
+then309:
+    %t1224 = ref state
+    %t1225 = const i64 15
+    %t1226 = call take(%t1224, %t1225)
+    %t1227 = ref state
+    %t1228 = call current(%t1227)
+    %t1229 = field %t1228.kind
+    %t1230 = const i64 14
+    %t1231 = eq %t1229, %t1230
+    branch %t1231 ? then312 : else313
+then312:
+    %t1232 = ref s
+    %t1233 = ref_field %t1232.elseStmts
+    %t1234 = ref state
+    %t1235 = call parseStatement(%t1234)
+    call push(%t1233, %t1235)
+    jump endif314
+else313:
+    %t1236 = ref state
+    %t1237 = call current(%t1236)
+    %t1238 = field %t1237.kind
+    %t1239 = const i64 22
+    %t1240 = eq %t1238, %t1239
+    branch %t1240 ? then315 : else316
+then315:
+    %t1241 = ref state
+    %t1242 = call parseBlock(%t1241)
+    field_set s.elseStmts = %t1242
+    jump endif317
+else316:
+    %t1243 = ref s
+    %t1244 = ref_field %t1243.elseStmts
+    %t1245 = ref state
+    %t1246 = call parseStatement(%t1245)
+    call push(%t1244, %t1246)
+    jump endif317
+endif317:
+    jump endif314
+endif314:
+    jump endif311
+else310:
+    jump endif311
+endif311:
+    %t1247 = ref state
+    %t1248 = load s
+    %t1249 = call addStmt(%t1247, %t1248)
+    return %t1249
+    jump endif308
+else307:
+    jump endif308
+endif308:
+    %t1250 = load k
+    %t1251 = const i64 16
+    %t1252 = eq %t1250, %t1251
+    branch %t1252 ? then318 : else319
+then318:
+    %t1253 = ref state
+    %t1254 = const i64 16
+    %t1255 = call take(%t1253, %t1254)
+    %t1256 = const i64 6
+    %t1257 = call emptyStmt(%t1256)
+    local Stmt s
+    store s, %t1257
+    %t1258 = ref state
+    %t1259 = const i64 20
+    %t1260 = call maybe(%t1258, %t1259)
+    %t1261 = ref state
+    %t1262 = const i64 0
+    %t1263 = call parseExpression(%t1261, %t1262)
+    field_set s.expr = %t1263
+    %t1264 = ref state
+    %t1265 = const i64 21
+    %t1266 = call maybe(%t1264, %t1265)
+    %t1267 = ref state
+    %t1268 = call parseControlledBody(%t1267)
+    field_set s.body = %t1268
+    %t1269 = ref state
+    %t1270 = load s
+    %t1271 = call addStmt(%t1269, %t1270)
+    return %t1271
+    jump endif320
+else319:
+    jump endif320
+endif320:
+    %t1272 = ref state
+    %t1273 = const i64 0
+    %t1274 = call parseExpression(%t1272, %t1273)
+    local i64 first
+    store first, %t1274
+    %t1275 = load first
+    %t1276 = const i64 0
+    %t1277 = lt %t1275, %t1276
+    branch %t1277 ? then321 : else322
+then321:
+    %t1278 = load state
+    %t1279 = field %t1278.pos
+    %t1280 = const i64 1
+    %t1281 = add %t1279, %t1280
+    field_set state.pos = %t1281
+    %t1282 = const i64 1
+    %t1283 = neg %t1282
+    return %t1283
+    jump endif323
+else322:
+    jump endif323
+endif323:
+    %t1284 = ref state
+    %t1285 = call current(%t1284)
+    %t1286 = field %t1285.kind
+    %t1287 = const i64 30
+    %t1288 = eq %t1286, %t1287
+    branch %t1288 ? then324 : else325
+then324:
+    %t1289 = ref state
+    %t1290 = const i64 30
+    %t1291 = call take(%t1289, %t1290)
+    %t1292 = const i64 4
+    %t1293 = call emptyStmt(%t1292)
+    local Stmt s
+    store s, %t1293
+    %t1294 = load first
+    field_set s.left = %t1294
+    %t1295 = ref state
+    %t1296 = const i64 0
+    %t1297 = call parseExpression(%t1295, %t1296)
+    field_set s.right = %t1297
+    %t1298 = ref state
+    %t1299 = const i64 24
+    %t1300 = call maybe(%t1298, %t1299)
+    %t1301 = ref state
+    %t1302 = load s
+    %t1303 = call addStmt(%t1301, %t1302)
+    return %t1303
+    jump endif326
+else325:
+    jump endif326
+endif326:
+    %t1304 = const i64 3
+    %t1305 = call emptyStmt(%t1304)
+    local Stmt s
+    store s, %t1305
+    %t1306 = load first
+    field_set s.expr = %t1306
+    %t1307 = ref state
+    %t1308 = const i64 24
+    %t1309 = call maybe(%t1307, %t1308)
+    %t1310 = ref state
+    %t1311 = load s
+    %t1312 = call addStmt(%t1310, %t1311)
+    return %t1312
+endfunction
+function parseFunction(Ref<ParserState> state) -> FunctionDef
+entry:
+    %t1313 = ref state
+    %t1314 = const i64 10
+    %t1315 = call take(%t1313, %t1314)
+    %t1316 = new FunctionDef
+    local FunctionDef f
+    store f, %t1316
+    %t1317 = ref state
+    %t1318 = const i64 1
+    %t1319 = call take(%t1317, %t1318)
+    local Token name
+    store name, %t1319
+    %t1320 = load name
+    %t1321 = field %t1320.text
+    field_set f.name = %t1321
+    %t1322 = list()
+    field_set f.params = %t1322
+    %t1323 = const string "void"
+    field_set f.returnType = %t1323
+    %t1324 = ref state
+    %t1325 = const i64 20
+    %t1326 = call maybe(%t1324, %t1325)
+    %t1327 = ref state
+    %t1328 = call current(%t1327)
+    %t1329 = field %t1328.kind
+    %t1330 = const i64 21
+    %t1331 = ne %t1329, %t1330
+    branch %t1331 ? then327 : else328
+then327:
+    %t1332 = const bool true
+    local bool more
+    store more, %t1332
+    jump while330
+while330:
+    %t1333 = load more
+    branch %t1333 ? while_body331 : while_end332
+while_body331:
+    %t1334 = new Param
+    local Param p
+    store p, %t1334
+    %t1335 = ref state
+    %t1336 = const i64 1
+    %t1337 = call take(%t1335, %t1336)
+    local Token pname
+    store pname, %t1337
+    %t1338 = load pname
+    %t1339 = field %t1338.text
+    field_set p.name = %t1339
+    %t1340 = ref state
+    %t1341 = const i64 25
+    %t1342 = call maybe(%t1340, %t1341)
+    %t1343 = ref state
+    %t1344 = call parseType(%t1343)
+    field_set p.type = %t1344
+    %t1345 = ref f
+    %t1346 = ref_field %t1345.params
+    %t1347 = load p
+    call push(%t1346, %t1347)
+    %t1348 = ref state
+    %t1349 = const i64 26
+    %t1350 = call maybe(%t1348, %t1349)
+    %t1351 = not %t1350
+    branch %t1351 ? then333 : else334
+then333:
+    %t1352 = const bool false
+    store more, %t1352
+    jump endif335
+else334:
+    jump endif335
+endif335:
+    jump while330
+while_end332:
+    jump endif329
+else328:
+    jump endif329
+endif329:
+    %t1353 = ref state
+    %t1354 = const i64 21
+    %t1355 = call maybe(%t1353, %t1354)
+    %t1356 = ref state
+    %t1357 = call current(%t1356)
+    %t1358 = field %t1357.kind
+    %t1359 = const i64 45
+    %t1360 = eq %t1358, %t1359
+    branch %t1360 ? then336 : else337
+then336:
+    %t1361 = ref state
+    %t1362 = const i64 45
+    %t1363 = call take(%t1361, %t1362)
+    %t1364 = ref state
+    %t1365 = call parseType(%t1364)
+    field_set f.returnType = %t1365
+    jump endif338
+else337:
+    jump endif338
+endif338:
+    %t1366 = ref state
+    %t1367 = call parseBlock(%t1366)
+    field_set f.body = %t1367
+    %t1368 = load f
+    return %t1368
+endfunction
+function parseStruct(Ref<ParserState> state) -> StructDef
+entry:
+    %t1369 = ref state
+    %t1370 = const i64 11
+    %t1371 = call take(%t1369, %t1370)
+    %t1372 = new StructDef
+    local StructDef s
+    store s, %t1372
+    %t1373 = ref state
+    %t1374 = const i64 1
+    %t1375 = call take(%t1373, %t1374)
+    local Token name
+    store name, %t1375
+    %t1376 = load name
+    %t1377 = field %t1376.text
+    field_set s.name = %t1377
+    %t1378 = list()
+    field_set s.fields = %t1378
+    %t1379 = ref state
+    %t1380 = const i64 22
+    %t1381 = call maybe(%t1379, %t1380)
+    jump while339
+while339:
+    %t1382 = ref state
+    %t1383 = call current(%t1382)
+    %t1384 = field %t1383.kind
+    %t1385 = const i64 23
+    %t1386 = ne %t1384, %t1385
+    %t1387 = ref state
+    %t1388 = call current(%t1387)
+    %t1389 = field %t1388.kind
+    %t1390 = const i64 0
+    %t1391 = ne %t1389, %t1390
+    %t1392 = and %t1386, %t1391
+    branch %t1392 ? while_body340 : while_end341
+while_body340:
+    %t1393 = new Field
+    local Field f
+    store f, %t1393
+    %t1394 = ref state
+    %t1395 = const i64 1
+    %t1396 = call take(%t1394, %t1395)
+    local Token fname
+    store fname, %t1396
+    %t1397 = load fname
+    %t1398 = field %t1397.text
+    field_set f.name = %t1398
+    %t1399 = ref state
+    %t1400 = const i64 25
+    %t1401 = call maybe(%t1399, %t1400)
+    %t1402 = ref state
+    %t1403 = call parseType(%t1402)
+    field_set f.type = %t1403
+    %t1404 = ref s
+    %t1405 = ref_field %t1404.fields
+    %t1406 = load f
+    call push(%t1405, %t1406)
+    %t1407 = ref state
+    %t1408 = const i64 24
+    %t1409 = call maybe(%t1407, %t1408)
+    jump while339
+while_end341:
+    %t1410 = ref state
+    %t1411 = const i64 23
+    %t1412 = call maybe(%t1410, %t1411)
+    %t1413 = load s
+    return %t1413
+endfunction
+function parseProgram(string source) -> Program
+entry:
+    %t1414 = new ParserState
+    local ParserState state
+    store state, %t1414
+    %t1415 = load source
+    %t1416 = call lex(%t1415)
+    field_set state.tokens = %t1416
+    %t1417 = const i64 0
+    field_set state.pos = %t1417
+    %t1418 = list()
+    field_set state.exprs = %t1418
+    %t1419 = list()
+    field_set state.stmts = %t1419
+    %t1420 = list()
+    field_set state.functions = %t1420
+    %t1421 = list()
+    field_set state.structs = %t1421
+    jump while342
+while342:
+    %t1422 = ref state
+    %t1423 = call current(%t1422)
+    %t1424 = field %t1423.kind
+    %t1425 = const i64 0
+    %t1426 = ne %t1424, %t1425
+    branch %t1426 ? while_body343 : while_end344
+while_body343:
+    %t1427 = ref state
+    %t1428 = call current(%t1427)
+    %t1429 = field %t1428.kind
+    %t1430 = const i64 10
+    %t1431 = eq %t1429, %t1430
+    branch %t1431 ? then345 : else346
+then345:
+    %t1432 = ref state
+    %t1433 = ref_field %t1432.functions
+    %t1434 = ref state
+    %t1435 = call parseFunction(%t1434)
+    call push(%t1433, %t1435)
+    jump endif347
+else346:
+    %t1436 = ref state
+    %t1437 = call current(%t1436)
+    %t1438 = field %t1437.kind
+    %t1439 = const i64 11
+    %t1440 = eq %t1438, %t1439
+    branch %t1440 ? then348 : else349
+then348:
+    %t1441 = ref state
+    %t1442 = ref_field %t1441.structs
+    %t1443 = ref state
+    %t1444 = call parseStruct(%t1443)
+    call push(%t1442, %t1444)
+    jump endif350
+else349:
+    %t1445 = load state
+    %t1446 = field %t1445.pos
+    %t1447 = const i64 1
+    %t1448 = add %t1446, %t1447
+    field_set state.pos = %t1448
+    jump endif350
+endif350:
+    jump endif347
+endif347:
+    jump while342
+while_end344:
+    %t1449 = new Program
+    local Program p
+    store p, %t1449
+    %t1450 = load state
+    %t1451 = field %t1450.exprs
+    field_set p.exprs = %t1451
+    %t1452 = load state
+    %t1453 = field %t1452.stmts
+    field_set p.stmts = %t1453
+    %t1454 = load state
+    %t1455 = field %t1454.functions
+    field_set p.functions = %t1455
+    %t1456 = load state
+    %t1457 = field %t1456.structs
+    field_set p.structs = %t1457
+    %t1458 = load p
+    return %t1458
+endfunction
+function startsWithType(string type, string prefix) -> bool
+entry:
+    %t1459 = load type
+    %t1460 = call length(%t1459)
+    %t1461 = load prefix
+    %t1462 = call length(%t1461)
+    %t1463 = lt %t1460, %t1462
+    branch %t1463 ? then351 : else352
+then351:
+    %t1464 = const bool false
+    return %t1464
+    jump endif353
+else352:
+    jump endif353
+endif353:
+    %t1465 = load type
+    %t1466 = const i64 0
+    %t1467 = load prefix
+    %t1468 = call length(%t1467)
+    %t1469 = call slice(%t1465, %t1466, %t1468)
+    %t1470 = load prefix
+    %t1471 = eq %t1469, %t1470
+    return %t1471
+endfunction
+function innerGeneric(string type, string prefix) -> string
+entry:
+    %t1472 = load type
+    %t1473 = load prefix
+    %t1474 = call startsWithType(%t1472, %t1473)
+    %t1475 = not %t1474
+    branch %t1475 ? then354 : else355
+then354:
+    %t1476 = const string ""
+    return %t1476
+    jump endif356
+else355:
+    jump endif356
+endif356:
+    %t1477 = load type
+    %t1478 = call length(%t1477)
+    %t1479 = load prefix
+    %t1480 = call length(%t1479)
+    %t1481 = le %t1478, %t1480
+    branch %t1481 ? then357 : else358
+then357:
+    %t1482 = const string ""
+    return %t1482
+    jump endif359
+else358:
+    jump endif359
+endif359:
+    %t1483 = load type
+    %t1484 = load type
+    %t1485 = call length(%t1484)
+    %t1486 = const i64 1
+    %t1487 = sub %t1485, %t1486
+    %t1488 = index %t1483[%t1487]
+    %t1489 = const i64 62
+    %t1490 = ne %t1488, %t1489
+    branch %t1490 ? then360 : else361
+then360:
+    %t1491 = const string ""
+    return %t1491
+    jump endif362
+else361:
+    jump endif362
+endif362:
+    %t1492 = load type
+    %t1493 = load prefix
+    %t1494 = call length(%t1493)
+    %t1495 = load type
+    %t1496 = call length(%t1495)
+    %t1497 = const i64 1
+    %t1498 = sub %t1496, %t1497
+    %t1499 = call slice(%t1492, %t1494, %t1498)
+    return %t1499
+endfunction
+function structIndex(Ref<Program> program, string name) -> i64
+entry:
+    %t1500 = const i64 0
+    local i64 i
+    store i, %t1500
+    jump while363
+while363:
+    %t1501 = load i
+    %t1502 = load program
+    %t1503 = field %t1502.structs
+    %t1504 = call listLength(%t1503)
+    %t1505 = lt %t1501, %t1504
+    branch %t1505 ? while_body364 : while_end365
+while_body364:
+    %t1506 = load program
+    %t1507 = field %t1506.structs
+    %t1508 = load i
+    %t1509 = index %t1507[%t1508]
+    %t1510 = field %t1509.name
+    %t1511 = load name
+    %t1512 = eq %t1510, %t1511
+    branch %t1512 ? then366 : else367
+then366:
+    %t1513 = load i
+    return %t1513
+    jump endif368
+else367:
+    jump endif368
+endif368:
+    %t1514 = load i
+    %t1515 = const i64 1
+    %t1516 = add %t1514, %t1515
+    store i, %t1516
+    jump while363
+while_end365:
+    %t1517 = const i64 1
+    %t1518 = neg %t1517
+    return %t1518
+endfunction
+function functionIndex(Ref<Program> program, string name) -> i64
+entry:
+    %t1519 = const i64 0
+    local i64 i
+    store i, %t1519
+    jump while369
+while369:
+    %t1520 = load i
+    %t1521 = load program
+    %t1522 = field %t1521.functions
+    %t1523 = call listLength(%t1522)
+    %t1524 = lt %t1520, %t1523
+    branch %t1524 ? while_body370 : while_end371
+while_body370:
+    %t1525 = load program
+    %t1526 = field %t1525.functions
+    %t1527 = load i
+    %t1528 = index %t1526[%t1527]
+    %t1529 = field %t1528.name
+    %t1530 = load name
+    %t1531 = eq %t1529, %t1530
+    branch %t1531 ? then372 : else373
+then372:
+    %t1532 = load i
+    return %t1532
+    jump endif374
+else373:
+    jump endif374
+endif374:
+    %t1533 = load i
+    %t1534 = const i64 1
+    %t1535 = add %t1533, %t1534
+    store i, %t1535
+    jump while369
+while_end371:
+    %t1536 = const i64 1
+    %t1537 = neg %t1536
+    return %t1537
+endfunction
+function fieldIndex(StructDef s, string name) -> i64
+entry:
+    %t1538 = const i64 0
+    local i64 i
+    store i, %t1538
+    jump while375
+while375:
+    %t1539 = load i
+    %t1540 = load s
+    %t1541 = field %t1540.fields
+    %t1542 = call listLength(%t1541)
+    %t1543 = lt %t1539, %t1542
+    branch %t1543 ? while_body376 : while_end377
+while_body376:
+    %t1544 = load s
+    %t1545 = field %t1544.fields
+    %t1546 = load i
+    %t1547 = index %t1545[%t1546]
+    %t1548 = field %t1547.name
+    %t1549 = load name
+    %t1550 = eq %t1548, %t1549
+    branch %t1550 ? then378 : else379
+then378:
+    %t1551 = load i
+    return %t1551
+    jump endif380
+else379:
+    jump endif380
+endif380:
+    %t1552 = load i
+    %t1553 = const i64 1
+    %t1554 = add %t1552, %t1553
+    store i, %t1554
+    jump while375
+while_end377:
+    %t1555 = const i64 1
+    %t1556 = neg %t1555
+    return %t1556
+endfunction
+function bindingType(Ref<List<Binding>> scope, string name) -> string
+entry:
+    %t1557 = const i64 0
+    local i64 i
+    store i, %t1557
+    jump while381
+while381:
+    %t1558 = load i
+    %t1559 = load scope
+    %t1560 = call listLength(%t1559)
+    %t1561 = lt %t1558, %t1560
+    branch %t1561 ? while_body382 : while_end383
+while_body382:
+    %t1562 = load scope
+    %t1563 = load i
+    %t1564 = index %t1562[%t1563]
+    %t1565 = field %t1564.name
+    %t1566 = load name
+    %t1567 = eq %t1565, %t1566
+    branch %t1567 ? then384 : else385
+then384:
+    %t1568 = load scope
+    %t1569 = load i
+    %t1570 = index %t1568[%t1569]
+    %t1571 = field %t1570.type
+    return %t1571
+    jump endif386
+else385:
+    jump endif386
+endif386:
+    %t1572 = load i
+    %t1573 = const i64 1
+    %t1574 = add %t1572, %t1573
+    store i, %t1574
+    jump while381
+while_end383:
+    %t1575 = const string ""
+    return %t1575
+endfunction
+function cloneBindings(Ref<List<Binding>> scope) -> List<Binding>
+entry:
+    %t1576 = list()
+    local List<Binding> out
+    store out, %t1576
+    %t1577 = const i64 0
+    local i64 i
+    store i, %t1577
+    jump while387
+while387:
+    %t1578 = load i
+    %t1579 = load scope
+    %t1580 = call listLength(%t1579)
+    %t1581 = lt %t1578, %t1580
+    branch %t1581 ? while_body388 : while_end389
+while_body388:
+    %t1582 = ref out
+    %t1583 = load scope
+    %t1584 = load i
+    %t1585 = index %t1583[%t1584]
+    call push(%t1582, %t1585)
+    %t1586 = load i
+    %t1587 = const i64 1
+    %t1588 = add %t1586, %t1587
+    store i, %t1588
+    jump while387
+while_end389:
+    %t1589 = load out
+    return %t1589
+endfunction
+function semanticFail(Ref<SemanticState> state, string message) -> string
+entry:
+    %t1590 = load state
+    %t1591 = field %t1590.ok
+    branch %t1591 ? then390 : else391
+then390:
+    %t1592 = const bool false
+    field_set state.ok = %t1592
+    %t1593 = load message
+    field_set state.message = %t1593
+    %t1594 = const string "semantic-error: "
+    %t1595 = load message
+    %t1596 = add %t1594, %t1595
+    call print(%t1596)
+    jump endif392
+else391:
+    jump endif392
+endif392:
+    %t1597 = const string ""
+    return %t1597
+endfunction
+function validateType(Ref<Program> program, Ref<SemanticState> state, string type, bool allowVoid) -> bool
+entry:
+    %t1598 = load state
+    %t1599 = field %t1598.ok
+    %t1600 = not %t1599
+    branch %t1600 ? then393 : else394
+then393:
+    %t1601 = const bool false
+    return %t1601
+    jump endif395
+else394:
+    jump endif395
+endif395:
+    %t1602 = load type
+    %t1603 = const string "void"
+    %t1604 = eq %t1602, %t1603
+    branch %t1604 ? then396 : else397
+then396:
+    %t1605 = load allowVoid
+    branch %t1605 ? then399 : else400
+then399:
+    %t1606 = const bool true
+    return %t1606
+    jump endif401
+else400:
+    jump endif401
+endif401:
+    %t1607 = ref state
+    %t1608 = const string "void is not valid here"
+    %t1609 = call semanticFail(%t1607, %t1608)
+    %t1610 = const bool false
+    return %t1610
+    jump endif398
+else397:
+    jump endif398
+endif398:
+    %t1611 = load type
+    %t1612 = const string "i64"
+    %t1613 = eq %t1611, %t1612
+    %t1614 = load type
+    %t1615 = const string "f64"
+    %t1616 = eq %t1614, %t1615
+    %t1617 = or %t1613, %t1616
+    %t1618 = load type
+    %t1619 = const string "bool"
+    %t1620 = eq %t1618, %t1619
+    %t1621 = or %t1617, %t1620
+    %t1622 = load type
+    %t1623 = const string "char"
+    %t1624 = eq %t1622, %t1623
+    %t1625 = or %t1621, %t1624
+    %t1626 = load type
+    %t1627 = const string "string"
+    %t1628 = eq %t1626, %t1627
+    %t1629 = or %t1625, %t1628
+    branch %t1629 ? then402 : else403
+then402:
+    %t1630 = const bool true
+    return %t1630
+    jump endif404
+else403:
+    jump endif404
+endif404:
+    %t1631 = load type
+    %t1632 = const string "List<"
+    %t1633 = call innerGeneric(%t1631, %t1632)
+    local string listInner
+    store listInner, %t1633
+    %t1634 = load listInner
+    %t1635 = const string ""
+    %t1636 = ne %t1634, %t1635
+    branch %t1636 ? then405 : else406
+then405:
+    %t1637 = ref program
+    %t1638 = ref state
+    %t1639 = load listInner
+    %t1640 = const bool false
+    %t1641 = call validateType(%t1637, %t1638, %t1639, %t1640)
+    return %t1641
+    jump endif407
+else406:
+    jump endif407
+endif407:
+    %t1642 = load type
+    %t1643 = const string "Ref<"
+    %t1644 = call innerGeneric(%t1642, %t1643)
+    local string refInner
+    store refInner, %t1644
+    %t1645 = load refInner
+    %t1646 = const string ""
+    %t1647 = ne %t1645, %t1646
+    branch %t1647 ? then408 : else409
+then408:
+    %t1648 = ref program
+    %t1649 = ref state
+    %t1650 = load refInner
+    %t1651 = const bool false
+    %t1652 = call validateType(%t1648, %t1649, %t1650, %t1651)
+    return %t1652
+    jump endif410
+else409:
+    jump endif410
+endif410:
+    %t1653 = ref program
+    %t1654 = load type
+    %t1655 = call structIndex(%t1653, %t1654)
+    %t1656 = const i64 0
+    %t1657 = ge %t1655, %t1656
+    branch %t1657 ? then411 : else412
+then411:
+    %t1658 = const bool true
+    return %t1658
+    jump endif413
+else412:
+    jump endif413
+endif413:
+    %t1659 = ref state
+    %t1660 = const string "unknown type "
+    %t1661 = load type
+    %t1662 = add %t1660, %t1661
+    %t1663 = call semanticFail(%t1659, %t1662)
+    %t1664 = const bool false
+    return %t1664
+endfunction
+function valueTypeForParam(string type) -> string
+entry:
+    %t1665 = load type
+    %t1666 = const string "Ref<"
+    %t1667 = call innerGeneric(%t1665, %t1666)
+    local string inner
+    store inner, %t1667
+    %t1668 = load inner
+    %t1669 = const string ""
+    %t1670 = ne %t1668, %t1669
+    branch %t1670 ? then414 : else415
+then414:
+    %t1671 = load inner
+    return %t1671
+    jump endif416
+else415:
+    jump endif416
+endif416:
+    %t1672 = load type
+    return %t1672
+endfunction
+function numericType(string type) -> bool
+entry:
+    %t1673 = load type
+    %t1674 = const string "i64"
+    %t1675 = eq %t1673, %t1674
+    %t1676 = load type
+    %t1677 = const string "f64"
+    %t1678 = eq %t1676, %t1677
+    %t1679 = or %t1675, %t1678
+    %t1680 = load type
+    %t1681 = const string "char"
+    %t1682 = eq %t1680, %t1681
+    %t1683 = or %t1679, %t1682
+    return %t1683
+endfunction
+function assignableType(string expected, string actual) -> bool
+entry:
+    %t1684 = load expected
+    %t1685 = load actual
+    %t1686 = eq %t1684, %t1685
+    branch %t1686 ? then417 : else418
+then417:
+    %t1687 = const bool true
+    return %t1687
+    jump endif419
+else418:
+    jump endif419
+endif419:
+    %t1688 = load expected
+    %t1689 = const string "f64"
+    %t1690 = eq %t1688, %t1689
+    %t1691 = load actual
+    %t1692 = call numericType(%t1691)
+    %t1693 = and %t1690, %t1692
+    branch %t1693 ? then420 : else421
+then420:
+    %t1694 = const bool true
+    return %t1694
+    jump endif422
+else421:
+    jump endif422
+endif422:
+    %t1695 = load expected
+    %t1696 = const string "i64"
+    %t1697 = eq %t1695, %t1696
+    %t1698 = load actual
+    %t1699 = const string "char"
+    %t1700 = eq %t1698, %t1699
+    %t1701 = and %t1697, %t1700
+    branch %t1701 ? then423 : else424
+then423:
+    %t1702 = const bool true
+    return %t1702
+    jump endif425
+else424:
+    jump endif425
+endif425:
+    %t1703 = const bool false
+    return %t1703
+endfunction
+function builtinReturnType(string name, List<i64> args, Ref<Program> program, Ref<SemanticState> state, Ref<List<Binding>> scope) -> string
+entry:
+    %t1704 = load name
+    %t1705 = const string "print"
+    %t1706 = eq %t1704, %t1705
+    branch %t1706 ? then426 : else427
+then426:
+    %t1707 = const string "void"
+    return %t1707
+    jump endif428
+else427:
+    jump endif428
+endif428:
+    %t1708 = load name
+    %t1709 = const string "readFile"
+    %t1710 = eq %t1708, %t1709
+    branch %t1710 ? then429 : else430
+then429:
+    %t1711 = const string "string"
+    return %t1711
+    jump endif431
+else430:
+    jump endif431
+endif431:
+    %t1712 = load name
+    %t1713 = const string "writeFile"
+    %t1714 = eq %t1712, %t1713
+    branch %t1714 ? then432 : else433
+then432:
+    %t1715 = const string "void"
+    return %t1715
+    jump endif434
+else433:
+    jump endif434
+endif434:
+    %t1716 = load name
+    %t1717 = const string "length"
+    %t1718 = eq %t1716, %t1717
+    branch %t1718 ? then435 : else436
+then435:
+    %t1719 = const string "i64"
+    return %t1719
+    jump endif437
+else436:
+    jump endif437
+endif437:
+    %t1720 = load name
+    %t1721 = const string "slice"
+    %t1722 = eq %t1720, %t1721
+    branch %t1722 ? then438 : else439
+then438:
+    %t1723 = const string "string"
+    return %t1723
+    jump endif440
+else439:
+    jump endif440
+endif440:
+    %t1724 = load name
+    %t1725 = const string "int_to_string"
+    %t1726 = eq %t1724, %t1725
+    branch %t1726 ? then441 : else442
+then441:
+    %t1727 = const string "string"
+    return %t1727
+    jump endif443
+else442:
+    jump endif443
+endif443:
+    %t1728 = load name
+    %t1729 = const string "listLength"
+    %t1730 = eq %t1728, %t1729
+    branch %t1730 ? then444 : else445
+then444:
+    %t1731 = const string "i64"
+    return %t1731
+    jump endif446
+else445:
+    jump endif446
+endif446:
+    %t1732 = load name
+    %t1733 = const string "push"
+    %t1734 = eq %t1732, %t1733
+    branch %t1734 ? then447 : else448
+then447:
+    %t1735 = load args
+    %t1736 = call listLength(%t1735)
+    %t1737 = const i64 2
+    %t1738 = lt %t1736, %t1737
+    branch %t1738 ? then450 : else451
+then450:
+    %t1739 = ref state
+    %t1740 = const string "push requires a list and value"
+    %t1741 = call semanticFail(%t1739, %t1740)
+    return %t1741
+    jump endif452
+else451:
+    jump endif452
+endif452:
+    %t1742 = ref program
+    %t1743 = load args
+    %t1744 = const i64 0
+    %t1745 = index %t1743[%t1744]
+    %t1746 = call isLValue(%t1742, %t1745)
+    %t1747 = not %t1746
+    branch %t1747 ? then453 : else454
+then453:
+    %t1748 = ref state
+    %t1749 = const string "push first argument must be an lvalue"
+    %t1750 = call semanticFail(%t1748, %t1749)
+    return %t1750
+    jump endif455
+else454:
+    jump endif455
+endif455:
+    %t1751 = ref program
+    %t1752 = ref state
+    %t1753 = ref scope
+    %t1754 = load args
+    %t1755 = const i64 0
+    %t1756 = index %t1754[%t1755]
+    %t1757 = call checkExpr(%t1751, %t1752, %t1753, %t1756)
+    local string listType
+    store listType, %t1757
+    %t1758 = load listType
+    %t1759 = const string "List<"
+    %t1760 = call innerGeneric(%t1758, %t1759)
+    local string inner
+    store inner, %t1760
+    %t1761 = load inner
+    %t1762 = const string ""
+    %t1763 = eq %t1761, %t1762
+    branch %t1763 ? then456 : else457
+then456:
+    %t1764 = ref state
+    %t1765 = const string "push first argument must be List<T>"
+    %t1766 = call semanticFail(%t1764, %t1765)
+    return %t1766
+    jump endif458
+else457:
+    jump endif458
+endif458:
+    %t1767 = ref program
+    %t1768 = ref state
+    %t1769 = ref scope
+    %t1770 = load args
+    %t1771 = const i64 1
+    %t1772 = index %t1770[%t1771]
+    %t1773 = call checkExpr(%t1767, %t1768, %t1769, %t1772)
+    local string valueType
+    store valueType, %t1773
+    %t1774 = load inner
+    %t1775 = load valueType
+    %t1776 = call assignableType(%t1774, %t1775)
+    %t1777 = not %t1776
+    branch %t1777 ? then459 : else460
+then459:
+    %t1778 = ref state
+    %t1779 = const string "push value type mismatch"
+    %t1780 = call semanticFail(%t1778, %t1779)
+    return %t1780
+    jump endif461
+else460:
+    jump endif461
+endif461:
+    %t1781 = const string "void"
+    return %t1781
+    jump endif449
+else448:
+    jump endif449
+endif449:
+    %t1782 = load name
+    %t1783 = const string "append"
+    %t1784 = eq %t1782, %t1783
+    branch %t1784 ? then462 : else463
+then462:
+    %t1785 = load args
+    %t1786 = call listLength(%t1785)
+    %t1787 = const i64 0
+    %t1788 = eq %t1786, %t1787
+    branch %t1788 ? then465 : else466
+then465:
+    %t1789 = const string ""
+    return %t1789
+    jump endif467
+else466:
+    jump endif467
+endif467:
+    %t1790 = ref program
+    %t1791 = ref state
+    %t1792 = ref scope
+    %t1793 = load args
+    %t1794 = const i64 0
+    %t1795 = index %t1793[%t1794]
+    %t1796 = call checkExpr(%t1790, %t1791, %t1792, %t1795)
+    local string first
+    store first, %t1796
+    %t1797 = load first
+    %t1798 = const string "List<"
+    %t1799 = call innerGeneric(%t1797, %t1798)
+    local string element
+    store element, %t1799
+    %t1800 = load element
+    %t1801 = const string ""
+    %t1802 = eq %t1800, %t1801
+    branch %t1802 ? then468 : else469
+then468:
+    %t1803 = ref state
+    %t1804 = const string "append requires a List value"
+    %t1805 = call semanticFail(%t1803, %t1804)
+    return %t1805
+    jump endif470
+else469:
+    jump endif470
+endif470:
+    %t1806 = load first
+    return %t1806
+    jump endif464
+else463:
+    jump endif464
+endif464:
+    %t1807 = const string ""
+    return %t1807
+endfunction
+function checkExpr(Ref<Program> program, Ref<SemanticState> state, Ref<List<Binding>> scope, i64 id) -> string
+entry:
+    %t1808 = load state
+    %t1809 = field %t1808.ok
+    %t1810 = not %t1809
+    branch %t1810 ? then471 : else472
+then471:
+    %t1811 = const string ""
+    return %t1811
+    jump endif473
+else472:
+    jump endif473
+endif473:
+    %t1812 = load id
+    %t1813 = const i64 0
+    %t1814 = lt %t1812, %t1813
+    %t1815 = load id
+    %t1816 = load program
+    %t1817 = field %t1816.exprs
+    %t1818 = call listLength(%t1817)
+    %t1819 = ge %t1815, %t1818
+    %t1820 = or %t1814, %t1819
+    branch %t1820 ? then474 : else475
+then474:
+    %t1821 = ref state
+    %t1822 = const string "invalid expression reference"
+    %t1823 = call semanticFail(%t1821, %t1822)
+    return %t1823
+    jump endif476
+else475:
+    jump endif476
+endif476:
+    %t1824 = load program
+    %t1825 = field %t1824.exprs
+    %t1826 = load id
+    %t1827 = index %t1825[%t1826]
+    local Expr x
+    store x, %t1827
+    %t1828 = load x
+    %t1829 = field %t1828.kind
+    %t1830 = const i64 1
+    %t1831 = eq %t1829, %t1830
+    branch %t1831 ? then477 : else478
+then477:
+    %t1832 = const string "i64"
+    return %t1832
+    jump endif479
+else478:
+    jump endif479
+endif479:
+    %t1833 = load x
+    %t1834 = field %t1833.kind
+    %t1835 = const i64 2
+    %t1836 = eq %t1834, %t1835
+    branch %t1836 ? then480 : else481
+then480:
+    %t1837 = const string "string"
+    return %t1837
+    jump endif482
+else481:
+    jump endif482
+endif482:
+    %t1838 = load x
+    %t1839 = field %t1838.kind
+    %t1840 = const i64 3
+    %t1841 = eq %t1839, %t1840
+    branch %t1841 ? then483 : else484
+then483:
+    %t1842 = const string "char"
+    return %t1842
+    jump endif485
+else484:
+    jump endif485
+endif485:
+    %t1843 = load x
+    %t1844 = field %t1843.kind
+    %t1845 = const i64 4
+    %t1846 = eq %t1844, %t1845
+    branch %t1846 ? then486 : else487
+then486:
+    %t1847 = const string "bool"
+    return %t1847
+    jump endif488
+else487:
+    jump endif488
+endif488:
+    %t1848 = load x
+    %t1849 = field %t1848.kind
+    %t1850 = const i64 5
+    %t1851 = eq %t1849, %t1850
+    branch %t1851 ? then489 : else490
+then489:
+    %t1852 = ref scope
+    %t1853 = load x
+    %t1854 = field %t1853.text
+    %t1855 = call bindingType(%t1852, %t1854)
+    local string t
+    store t, %t1855
+    %t1856 = load t
+    %t1857 = const string ""
+    %t1858 = eq %t1856, %t1857
+    branch %t1858 ? then492 : else493
+then492:
+    %t1859 = ref state
+    %t1860 = const string "unknown name "
+    %t1861 = load x
+    %t1862 = field %t1861.text
+    %t1863 = add %t1860, %t1862
+    %t1864 = call semanticFail(%t1859, %t1863)
+    return %t1864
+    jump endif494
+else493:
+    jump endif494
+endif494:
+    %t1865 = load t
+    return %t1865
+    jump endif491
+else490:
+    jump endif491
+endif491:
+    %t1866 = load x
+    %t1867 = field %t1866.kind
+    %t1868 = const i64 7
+    %t1869 = eq %t1867, %t1868
+    branch %t1869 ? then495 : else496
+then495:
+    %t1870 = ref program
+    %t1871 = ref state
+    %t1872 = ref scope
+    %t1873 = load x
+    %t1874 = field %t1873.left
+    %t1875 = call checkExpr(%t1870, %t1871, %t1872, %t1874)
+    local string a
+    store a, %t1875
+    %t1876 = load x
+    %t1877 = field %t1876.op
+    %t1878 = const string "!"
+    %t1879 = eq %t1877, %t1878
+    branch %t1879 ? then498 : else499
+then498:
+    %t1880 = load a
+    %t1881 = const string "bool"
+    %t1882 = ne %t1880, %t1881
+    branch %t1882 ? then501 : else502
+then501:
+    %t1883 = ref state
+    %t1884 = const string "! requires bool"
+    %t1885 = call semanticFail(%t1883, %t1884)
+    return %t1885
+    jump endif503
+else502:
+    jump endif503
+endif503:
+    %t1886 = const string "bool"
+    return %t1886
+    jump endif500
+else499:
+    jump endif500
+endif500:
+    %t1887 = load a
+    %t1888 = call numericType(%t1887)
+    %t1889 = not %t1888
+    branch %t1889 ? then504 : else505
+then504:
+    %t1890 = ref state
+    %t1891 = const string "unary "
+    %t1892 = load x
+    %t1893 = field %t1892.op
+    %t1894 = add %t1891, %t1893
+    %t1895 = const string " requires numeric operand"
+    %t1896 = add %t1894, %t1895
+    %t1897 = call semanticFail(%t1890, %t1896)
+    return %t1897
+    jump endif506
+else505:
+    jump endif506
+endif506:
+    %t1898 = load a
+    return %t1898
+    jump endif497
+else496:
+    jump endif497
+endif497:
+    %t1899 = load x
+    %t1900 = field %t1899.kind
+    %t1901 = const i64 6
+    %t1902 = eq %t1900, %t1901
+    branch %t1902 ? then507 : else508
+then507:
+    %t1903 = ref program
+    %t1904 = ref state
+    %t1905 = ref scope
+    %t1906 = load x
+    %t1907 = field %t1906.left
+    %t1908 = call checkExpr(%t1903, %t1904, %t1905, %t1907)
+    local string a
+    store a, %t1908
+    %t1909 = ref program
+    %t1910 = ref state
+    %t1911 = ref scope
+    %t1912 = load x
+    %t1913 = field %t1912.right
+    %t1914 = call checkExpr(%t1909, %t1910, %t1911, %t1913)
+    local string b
+    store b, %t1914
+    %t1915 = load x
+    %t1916 = field %t1915.op
+    %t1917 = const string "&&"
+    %t1918 = eq %t1916, %t1917
+    %t1919 = load x
+    %t1920 = field %t1919.op
+    %t1921 = const string "||"
+    %t1922 = eq %t1920, %t1921
+    %t1923 = or %t1918, %t1922
+    branch %t1923 ? then510 : else511
+then510:
+    %t1924 = load a
+    %t1925 = const string "bool"
+    %t1926 = ne %t1924, %t1925
+    %t1927 = load b
+    %t1928 = const string "bool"
+    %t1929 = ne %t1927, %t1928
+    %t1930 = or %t1926, %t1929
+    branch %t1930 ? then513 : else514
+then513:
+    %t1931 = ref state
+    %t1932 = load x
+    %t1933 = field %t1932.op
+    %t1934 = const string " requires bool operands"
+    %t1935 = add %t1933, %t1934
+    %t1936 = call semanticFail(%t1931, %t1935)
+    return %t1936
+    jump endif515
+else514:
+    jump endif515
+endif515:
+    %t1937 = const string "bool"
+    return %t1937
+    jump endif512
+else511:
+    jump endif512
+endif512:
+    %t1938 = load x
+    %t1939 = field %t1938.op
+    %t1940 = const string "=="
+    %t1941 = eq %t1939, %t1940
+    %t1942 = load x
+    %t1943 = field %t1942.op
+    %t1944 = const string "!="
+    %t1945 = eq %t1943, %t1944
+    %t1946 = or %t1941, %t1945
+    %t1947 = load x
+    %t1948 = field %t1947.op
+    %t1949 = const string "<"
+    %t1950 = eq %t1948, %t1949
+    %t1951 = or %t1946, %t1950
+    %t1952 = load x
+    %t1953 = field %t1952.op
+    %t1954 = const string "<="
+    %t1955 = eq %t1953, %t1954
+    %t1956 = or %t1951, %t1955
+    %t1957 = load x
+    %t1958 = field %t1957.op
+    %t1959 = const string ">"
+    %t1960 = eq %t1958, %t1959
+    %t1961 = or %t1956, %t1960
+    %t1962 = load x
+    %t1963 = field %t1962.op
+    %t1964 = const string ">="
+    %t1965 = eq %t1963, %t1964
+    %t1966 = or %t1961, %t1965
+    branch %t1966 ? then516 : else517
+then516:
+    %t1967 = load a
+    %t1968 = load b
+    %t1969 = eq %t1967, %t1968
+    %t1970 = load a
+    %t1971 = call numericType(%t1970)
+    %t1972 = load b
+    %t1973 = call numericType(%t1972)
+    %t1974 = and %t1971, %t1973
+    %t1975 = or %t1969, %t1974
+    %t1976 = not %t1975
+    branch %t1976 ? then519 : else520
+then519:
+    %t1977 = ref state
+    %t1978 = const string "cannot compare "
+    %t1979 = load a
+    %t1980 = add %t1978, %t1979
+    %t1981 = const string " and "
+    %t1982 = add %t1980, %t1981
+    %t1983 = load b
+    %t1984 = add %t1982, %t1983
+    %t1985 = call semanticFail(%t1977, %t1984)
+    return %t1985
+    jump endif521
+else520:
+    jump endif521
+endif521:
+    %t1986 = const string "bool"
+    return %t1986
+    jump endif518
+else517:
+    jump endif518
+endif518:
+    %t1987 = load x
+    %t1988 = field %t1987.op
+    %t1989 = const string "+"
+    %t1990 = eq %t1988, %t1989
+    %t1991 = load a
+    %t1992 = const string "string"
+    %t1993 = eq %t1991, %t1992
+    %t1994 = and %t1990, %t1993
+    %t1995 = load b
+    %t1996 = const string "string"
+    %t1997 = eq %t1995, %t1996
+    %t1998 = and %t1994, %t1997
+    branch %t1998 ? then522 : else523
+then522:
+    %t1999 = const string "string"
+    return %t1999
+    jump endif524
+else523:
+    jump endif524
+endif524:
+    %t2000 = load a
+    %t2001 = call numericType(%t2000)
+    %t2002 = not %t2001
+    %t2003 = load b
+    %t2004 = call numericType(%t2003)
+    %t2005 = not %t2004
+    %t2006 = or %t2002, %t2005
+    branch %t2006 ? then525 : else526
+then525:
+    %t2007 = ref state
+    %t2008 = const string "operator "
+    %t2009 = load x
+    %t2010 = field %t2009.op
+    %t2011 = add %t2008, %t2010
+    %t2012 = const string " requires numeric operands"
+    %t2013 = add %t2011, %t2012
+    %t2014 = call semanticFail(%t2007, %t2013)
+    return %t2014
+    jump endif527
+else526:
+    jump endif527
+endif527:
+    %t2015 = load a
+    %t2016 = const string "f64"
+    %t2017 = eq %t2015, %t2016
+    %t2018 = load b
+    %t2019 = const string "f64"
+    %t2020 = eq %t2018, %t2019
+    %t2021 = or %t2017, %t2020
+    branch %t2021 ? then528 : else529
+then528:
+    %t2022 = const string "f64"
+    return %t2022
+    jump endif530
+else529:
+    jump endif530
+endif530:
+    %t2023 = const string "i64"
+    return %t2023
+    jump endif509
+else508:
+    jump endif509
+endif509:
+    %t2024 = load x
+    %t2025 = field %t2024.kind
+    %t2026 = const i64 8
+    %t2027 = eq %t2025, %t2026
+    branch %t2027 ? then531 : else532
+then531:
+    %t2028 = load program
+    %t2029 = field %t2028.exprs
+    %t2030 = load x
+    %t2031 = field %t2030.left
+    %t2032 = index %t2029[%t2031]
+    local Expr calleeExpr
+    store calleeExpr, %t2032
+    %t2033 = load calleeExpr
+    %t2034 = field %t2033.text
+    local string name
+    store name, %t2034
+    %t2035 = load name
+    %t2036 = load x
+    %t2037 = field %t2036.args
+    %t2038 = ref program
+    %t2039 = ref state
+    %t2040 = ref scope
+    %t2041 = call builtinReturnType(%t2035, %t2037, %t2038, %t2039, %t2040)
+    local string builtin
+    store builtin, %t2041
+    %t2042 = load builtin
+    %t2043 = const string ""
+    %t2044 = ne %t2042, %t2043
+    branch %t2044 ? then534 : else535
+then534:
+    %t2045 = load builtin
+    return %t2045
+    jump endif536
+else535:
+    jump endif536
+endif536:
+    %t2046 = ref program
+    %t2047 = load name
+    %t2048 = call functionIndex(%t2046, %t2047)
+    local i64 fi
+    store fi, %t2048
+    %t2049 = load fi
+    %t2050 = const i64 0
+    %t2051 = lt %t2049, %t2050
+    branch %t2051 ? then537 : else538
+then537:
+    %t2052 = ref state
+    %t2053 = const string "unknown function "
+    %t2054 = load name
+    %t2055 = add %t2053, %t2054
+    %t2056 = call semanticFail(%t2052, %t2055)
+    return %t2056
+    jump endif539
+else538:
+    jump endif539
+endif539:
+    %t2057 = load program
+    %t2058 = field %t2057.functions
+    %t2059 = load fi
+    %t2060 = index %t2058[%t2059]
+    local FunctionDef fnDef
+    store fnDef, %t2060
+    %t2061 = load x
+    %t2062 = field %t2061.args
+    %t2063 = call listLength(%t2062)
+    %t2064 = load fnDef
+    %t2065 = field %t2064.params
+    %t2066 = call listLength(%t2065)
+    %t2067 = ne %t2063, %t2066
+    branch %t2067 ? then540 : else541
+then540:
+    %t2068 = ref state
+    %t2069 = const string "wrong argument count for "
+    %t2070 = load name
+    %t2071 = add %t2069, %t2070
+    %t2072 = call semanticFail(%t2068, %t2071)
+    return %t2072
+    jump endif542
+else541:
+    jump endif542
+endif542:
+    %t2073 = const i64 0
+    local i64 i
+    store i, %t2073
+    jump while543
+while543:
+    %t2074 = load i
+    %t2075 = load x
+    %t2076 = field %t2075.args
+    %t2077 = call listLength(%t2076)
+    %t2078 = lt %t2074, %t2077
+    branch %t2078 ? while_body544 : while_end545
+while_body544:
+    %t2079 = ref program
+    %t2080 = ref state
+    %t2081 = ref scope
+    %t2082 = load x
+    %t2083 = field %t2082.args
+    %t2084 = load i
+    %t2085 = index %t2083[%t2084]
+    %t2086 = call checkExpr(%t2079, %t2080, %t2081, %t2085)
+    local string actual
+    store actual, %t2086
+    %t2087 = load fnDef
+    %t2088 = field %t2087.params
+    %t2089 = load i
+    %t2090 = index %t2088[%t2089]
+    %t2091 = field %t2090.type
+    local string rawExpected
+    store rawExpected, %t2091
+    %t2092 = load rawExpected
+    %t2093 = call isRefType(%t2092)
+    %t2094 = ref program
+    %t2095 = load x
+    %t2096 = field %t2095.args
+    %t2097 = load i
+    %t2098 = index %t2096[%t2097]
+    %t2099 = call isLValue(%t2094, %t2098)
+    %t2100 = not %t2099
+    %t2101 = and %t2093, %t2100
+    branch %t2101 ? then546 : else547
+then546:
+    %t2102 = ref state
+    %t2103 = const string "argument must be an lvalue in "
+    %t2104 = load name
+    %t2105 = add %t2103, %t2104
+    %t2106 = call semanticFail(%t2102, %t2105)
+    return %t2106
+    jump endif548
+else547:
+    jump endif548
+endif548:
+    %t2107 = load rawExpected
+    %t2108 = call valueTypeForParam(%t2107)
+    local string expected
+    store expected, %t2108
+    %t2109 = load expected
+    %t2110 = load actual
+    %t2111 = call assignableType(%t2109, %t2110)
+    %t2112 = not %t2111
+    branch %t2112 ? then549 : else550
+then549:
+    %t2113 = ref state
+    %t2114 = const string "argument type mismatch in "
+    %t2115 = load name
+    %t2116 = add %t2114, %t2115
+    %t2117 = call semanticFail(%t2113, %t2116)
+    return %t2117
+    jump endif551
+else550:
+    jump endif551
+endif551:
+    %t2118 = load i
+    %t2119 = const i64 1
+    %t2120 = add %t2118, %t2119
+    store i, %t2120
+    jump while543
+while_end545:
+    %t2121 = load fnDef
+    %t2122 = field %t2121.returnType
+    return %t2122
+    jump endif533
+else532:
+    jump endif533
+endif533:
+    %t2123 = load x
+    %t2124 = field %t2123.kind
+    %t2125 = const i64 9
+    %t2126 = eq %t2124, %t2125
+    branch %t2126 ? then552 : else553
+then552:
+    %t2127 = ref program
+    %t2128 = ref state
+    %t2129 = ref scope
+    %t2130 = load x
+    %t2131 = field %t2130.left
+    %t2132 = call checkExpr(%t2127, %t2128, %t2129, %t2131)
+    local string base
+    store base, %t2132
+    %t2133 = ref program
+    %t2134 = load base
+    %t2135 = call structIndex(%t2133, %t2134)
+    local i64 si
+    store si, %t2135
+    %t2136 = load si
+    %t2137 = const i64 0
+    %t2138 = lt %t2136, %t2137
+    branch %t2138 ? then555 : else556
+then555:
+    %t2139 = ref state
+    %t2140 = const string "type "
+    %t2141 = load base
+    %t2142 = add %t2140, %t2141
+    %t2143 = const string " has no fields"
+    %t2144 = add %t2142, %t2143
+    %t2145 = call semanticFail(%t2139, %t2144)
+    return %t2145
+    jump endif557
+else556:
+    jump endif557
+endif557:
+    %t2146 = load program
+    %t2147 = field %t2146.structs
+    %t2148 = load si
+    %t2149 = index %t2147[%t2148]
+    local StructDef structDef
+    store structDef, %t2149
+    %t2150 = load structDef
+    %t2151 = load x
+    %t2152 = field %t2151.text
+    %t2153 = call fieldIndex(%t2150, %t2152)
+    local i64 fi
+    store fi, %t2153
+    %t2154 = load fi
+    %t2155 = const i64 0
+    %t2156 = lt %t2154, %t2155
+    branch %t2156 ? then558 : else559
+then558:
+    %t2157 = ref state
+    %t2158 = const string "unknown field "
+    %t2159 = load base
+    %t2160 = add %t2158, %t2159
+    %t2161 = const string "."
+    %t2162 = add %t2160, %t2161
+    %t2163 = load x
+    %t2164 = field %t2163.text
+    %t2165 = add %t2162, %t2164
+    %t2166 = call semanticFail(%t2157, %t2165)
+    return %t2166
+    jump endif560
+else559:
+    jump endif560
+endif560:
+    %t2167 = load structDef
+    %t2168 = field %t2167.fields
+    %t2169 = load fi
+    %t2170 = index %t2168[%t2169]
+    %t2171 = field %t2170.type
+    return %t2171
+    jump endif554
+else553:
+    jump endif554
+endif554:
+    %t2172 = load x
+    %t2173 = field %t2172.kind
+    %t2174 = const i64 10
+    %t2175 = eq %t2173, %t2174
+    branch %t2175 ? then561 : else562
+then561:
+    %t2176 = ref program
+    %t2177 = ref state
+    %t2178 = ref scope
+    %t2179 = load x
+    %t2180 = field %t2179.left
+    %t2181 = call checkExpr(%t2176, %t2177, %t2178, %t2180)
+    local string base
+    store base, %t2181
+    %t2182 = ref program
+    %t2183 = ref state
+    %t2184 = ref scope
+    %t2185 = load x
+    %t2186 = field %t2185.right
+    %t2187 = call checkExpr(%t2182, %t2183, %t2184, %t2186)
+    local string idx
+    store idx, %t2187
+    %t2188 = load idx
+    %t2189 = const string "i64"
+    %t2190 = ne %t2188, %t2189
+    %t2191 = load idx
+    %t2192 = const string "char"
+    %t2193 = ne %t2191, %t2192
+    %t2194 = and %t2190, %t2193
+    branch %t2194 ? then564 : else565
+then564:
+    %t2195 = ref state
+    %t2196 = const string "index must be i64"
+    %t2197 = call semanticFail(%t2195, %t2196)
+    return %t2197
+    jump endif566
+else565:
+    jump endif566
+endif566:
+    %t2198 = load base
+    %t2199 = const string "List<"
+    %t2200 = call innerGeneric(%t2198, %t2199)
+    local string inner
+    store inner, %t2200
+    %t2201 = load inner
+    %t2202 = const string ""
+    %t2203 = ne %t2201, %t2202
+    branch %t2203 ? then567 : else568
+then567:
+    %t2204 = load inner
+    return %t2204
+    jump endif569
+else568:
+    jump endif569
+endif569:
+    %t2205 = load base
+    %t2206 = const string "string"
+    %t2207 = eq %t2205, %t2206
+    branch %t2207 ? then570 : else571
+then570:
+    %t2208 = const string "i64"
+    return %t2208
+    jump endif572
+else571:
+    jump endif572
+endif572:
+    %t2209 = ref state
+    %t2210 = const string "type "
+    %t2211 = load base
+    %t2212 = add %t2210, %t2211
+    %t2213 = const string " is not indexable"
+    %t2214 = add %t2212, %t2213
+    %t2215 = call semanticFail(%t2209, %t2214)
+    return %t2215
+    jump endif563
+else562:
+    jump endif563
+endif563:
+    %t2216 = load x
+    %t2217 = field %t2216.kind
+    %t2218 = const i64 11
+    %t2219 = eq %t2217, %t2218
+    branch %t2219 ? then573 : else574
+then573:
+    %t2220 = ref program
+    %t2221 = ref state
+    %t2222 = load x
+    %t2223 = field %t2222.text
+    %t2224 = const bool false
+    %t2225 = call validateType(%t2220, %t2221, %t2223, %t2224)
+    %t2226 = not %t2225
+    branch %t2226 ? then576 : else577
+then576:
+    %t2227 = const string ""
+    return %t2227
+    jump endif578
+else577:
+    jump endif578
+endif578:
+    %t2228 = load x
+    %t2229 = field %t2228.text
+    return %t2229
+    jump endif575
+else574:
+    jump endif575
+endif575:
+    %t2230 = load x
+    %t2231 = field %t2230.kind
+    %t2232 = const i64 12
+    %t2233 = eq %t2231, %t2232
+    branch %t2233 ? then579 : else580
+then579:
+    %t2234 = load x
+    %t2235 = field %t2234.args
+    %t2236 = call listLength(%t2235)
+    %t2237 = const i64 0
+    %t2238 = eq %t2236, %t2237
+    branch %t2238 ? then582 : else583
+then582:
+    %t2239 = ref state
+    %t2240 = const string "empty list requires a type context"
+    %t2241 = call semanticFail(%t2239, %t2240)
+    return %t2241
+    jump endif584
+else583:
+    jump endif584
+endif584:
+    %t2242 = ref program
+    %t2243 = ref state
+    %t2244 = ref scope
+    %t2245 = load x
+    %t2246 = field %t2245.args
+    %t2247 = const i64 0
+    %t2248 = index %t2246[%t2247]
+    %t2249 = call checkExpr(%t2242, %t2243, %t2244, %t2248)
+    local string element
+    store element, %t2249
+    %t2250 = const i64 1
+    local i64 i
+    store i, %t2250
+    jump while585
+while585:
+    %t2251 = load i
+    %t2252 = load x
+    %t2253 = field %t2252.args
+    %t2254 = call listLength(%t2253)
+    %t2255 = lt %t2251, %t2254
+    branch %t2255 ? while_body586 : while_end587
+while_body586:
+    %t2256 = ref program
+    %t2257 = ref state
+    %t2258 = ref scope
+    %t2259 = load x
+    %t2260 = field %t2259.args
+    %t2261 = load i
+    %t2262 = index %t2260[%t2261]
+    %t2263 = call checkExpr(%t2256, %t2257, %t2258, %t2262)
+    local string currentType
+    store currentType, %t2263
+    %t2264 = load element
+    %t2265 = load currentType
+    %t2266 = call assignableType(%t2264, %t2265)
+    %t2267 = not %t2266
+    branch %t2267 ? then588 : else589
+then588:
+    %t2268 = ref state
+    %t2269 = const string "list elements have incompatible types"
+    %t2270 = call semanticFail(%t2268, %t2269)
+    return %t2270
+    jump endif590
+else589:
+    jump endif590
+endif590:
+    %t2271 = load i
+    %t2272 = const i64 1
+    %t2273 = add %t2271, %t2272
+    store i, %t2273
+    jump while585
+while_end587:
+    %t2274 = const string "List<"
+    %t2275 = load element
+    %t2276 = add %t2274, %t2275
+    %t2277 = const string ">"
+    %t2278 = add %t2276, %t2277
+    return %t2278
+    jump endif581
+else580:
+    jump endif581
+endif581:
+    %t2279 = ref state
+    %t2280 = const string "unsupported expression kind"
+    %t2281 = call semanticFail(%t2279, %t2280)
+    return %t2281
+endfunction
+function checkStatement(Ref<Program> program, Ref<SemanticState> state, Ref<List<Binding>> scope, i64 stmtId, string returnType) -> void
+entry:
+    %t2282 = load state
+    %t2283 = field %t2282.ok
+    %t2284 = not %t2283
+    branch %t2284 ? then591 : else592
+then591:
+    return
+    jump endif593
+else592:
+    jump endif593
+endif593:
+    %t2285 = load stmtId
+    %t2286 = const i64 0
+    %t2287 = lt %t2285, %t2286
+    %t2288 = load stmtId
+    %t2289 = load program
+    %t2290 = field %t2289.stmts
+    %t2291 = call listLength(%t2290)
+    %t2292 = ge %t2288, %t2291
+    %t2293 = or %t2287, %t2292
+    branch %t2293 ? then594 : else595
+then594:
+    %t2294 = ref state
+    %t2295 = const string "invalid statement reference"
+    %t2296 = call semanticFail(%t2294, %t2295)
+    return
+    jump endif596
+else595:
+    jump endif596
+endif596:
+    %t2297 = load program
+    %t2298 = field %t2297.stmts
+    %t2299 = load stmtId
+    %t2300 = index %t2298[%t2299]
+    local Stmt s
+    store s, %t2300
+    %t2301 = load s
+    %t2302 = field %t2301.kind
+    %t2303 = const i64 1
+    %t2304 = eq %t2302, %t2303
+    branch %t2304 ? then597 : else598
+then597:
+    %t2305 = ref scope
+    %t2306 = load s
+    %t2307 = field %t2306.name
+    %t2308 = call bindingType(%t2305, %t2307)
+    %t2309 = const string ""
+    %t2310 = ne %t2308, %t2309
+    branch %t2310 ? then600 : else601
+then600:
+    %t2311 = ref state
+    %t2312 = const string "variable already defined: "
+    %t2313 = load s
+    %t2314 = field %t2313.name
+    %t2315 = add %t2312, %t2314
+    %t2316 = call semanticFail(%t2311, %t2315)
+    return
+    jump endif602
+else601:
+    jump endif602
+endif602:
+    %t2317 = const string ""
+    local string actual
+    store actual, %t2317
+    %t2318 = load s
+    %t2319 = field %t2318.type
+    local string declared
+    store declared, %t2319
+    %t2320 = load declared
+    %t2321 = const string ""
+    %t2322 = ne %t2320, %t2321
+    %t2323 = load program
+    %t2324 = field %t2323.exprs
+    %t2325 = load s
+    %t2326 = field %t2325.expr
+    %t2327 = index %t2324[%t2326]
+    %t2328 = field %t2327.kind
+    %t2329 = const i64 12
+    %t2330 = eq %t2328, %t2329
+    %t2331 = and %t2322, %t2330
+    %t2332 = load program
+    %t2333 = field %t2332.exprs
+    %t2334 = load s
+    %t2335 = field %t2334.expr
+    %t2336 = index %t2333[%t2335]
+    %t2337 = field %t2336.args
+    %t2338 = call listLength(%t2337)
+    %t2339 = const i64 0
+    %t2340 = eq %t2338, %t2339
+    %t2341 = and %t2331, %t2340
+    branch %t2341 ? then603 : else604
+then603:
+    %t2342 = load declared
+    store actual, %t2342
+    jump endif605
+else604:
+    %t2343 = ref program
+    %t2344 = ref state
+    %t2345 = ref scope
+    %t2346 = load s
+    %t2347 = field %t2346.expr
+    %t2348 = call checkExpr(%t2343, %t2344, %t2345, %t2347)
+    store actual, %t2348
+    jump endif605
+endif605:
+    %t2349 = load declared
+    %t2350 = const string ""
+    %t2351 = eq %t2349, %t2350
+    branch %t2351 ? then606 : else607
+then606:
+    %t2352 = load actual
+    store declared, %t2352
+    jump endif608
+else607:
+    %t2353 = ref program
+    %t2354 = ref state
+    %t2355 = load declared
+    %t2356 = const bool false
+    %t2357 = call validateType(%t2353, %t2354, %t2355, %t2356)
+    %t2358 = not %t2357
+    branch %t2358 ? then609 : else610
+then609:
+    return
+    jump endif611
+else610:
+    jump endif611
+endif611:
+    jump endif608
+endif608:
+    %t2359 = load declared
+    %t2360 = load actual
+    %t2361 = call assignableType(%t2359, %t2360)
+    %t2362 = not %t2361
+    branch %t2362 ? then612 : else613
+then612:
+    %t2363 = ref state
+    %t2364 = const string "cannot initialize "
+    %t2365 = load declared
+    %t2366 = add %t2364, %t2365
+    %t2367 = const string " with "
+    %t2368 = add %t2366, %t2367
+    %t2369 = load actual
+    %t2370 = add %t2368, %t2369
+    %t2371 = call semanticFail(%t2363, %t2370)
+    jump endif614
+else613:
+    jump endif614
+endif614:
+    %t2372 = new Binding
+    local Binding b
+    store b, %t2372
+    %t2373 = load s
+    %t2374 = field %t2373.name
+    field_set b.name = %t2374
+    %t2375 = load declared
+    field_set b.type = %t2375
+    %t2376 = ref scope
+    %t2377 = load b
+    call push(%t2376, %t2377)
+    return
+    jump endif599
+else598:
+    jump endif599
+endif599:
+    %t2378 = load s
+    %t2379 = field %t2378.kind
+    %t2380 = const i64 2
+    %t2381 = eq %t2379, %t2380
+    branch %t2381 ? then615 : else616
+then615:
+    %t2382 = const string "void"
+    local string actual
+    store actual, %t2382
+    %t2383 = load s
+    %t2384 = field %t2383.expr
+    %t2385 = const i64 0
+    %t2386 = ge %t2384, %t2385
+    branch %t2386 ? then618 : else619
+then618:
+    %t2387 = ref program
+    %t2388 = ref state
+    %t2389 = ref scope
+    %t2390 = load s
+    %t2391 = field %t2390.expr
+    %t2392 = call checkExpr(%t2387, %t2388, %t2389, %t2391)
+    store actual, %t2392
+    jump endif620
+else619:
+    jump endif620
+endif620:
+    %t2393 = load returnType
+    %t2394 = load actual
+    %t2395 = call assignableType(%t2393, %t2394)
+    %t2396 = not %t2395
+    branch %t2396 ? then621 : else622
+then621:
+    %t2397 = ref state
+    %t2398 = const string "cannot return "
+    %t2399 = load actual
+    %t2400 = add %t2398, %t2399
+    %t2401 = const string " from "
+    %t2402 = add %t2400, %t2401
+    %t2403 = load returnType
+    %t2404 = add %t2402, %t2403
+    %t2405 = const string " function"
+    %t2406 = add %t2404, %t2405
+    %t2407 = call semanticFail(%t2397, %t2406)
+    jump endif623
+else622:
+    jump endif623
+endif623:
+    return
+    jump endif617
+else616:
+    jump endif617
+endif617:
+    %t2408 = load s
+    %t2409 = field %t2408.kind
+    %t2410 = const i64 3
+    %t2411 = eq %t2409, %t2410
+    branch %t2411 ? then624 : else625
+then624:
+    %t2412 = ref program
+    %t2413 = ref state
+    %t2414 = ref scope
+    %t2415 = load s
+    %t2416 = field %t2415.expr
+    %t2417 = call checkExpr(%t2412, %t2413, %t2414, %t2416)
+    return
+    jump endif626
+else625:
+    jump endif626
+endif626:
+    %t2418 = load s
+    %t2419 = field %t2418.kind
+    %t2420 = const i64 4
+    %t2421 = eq %t2419, %t2420
+    branch %t2421 ? then627 : else628
+then627:
+    %t2422 = ref program
+    %t2423 = ref state
+    %t2424 = ref scope
+    %t2425 = load s
+    %t2426 = field %t2425.left
+    %t2427 = call checkExpr(%t2422, %t2423, %t2424, %t2426)
+    local string lhs
+    store lhs, %t2427
+    %t2428 = const string ""
+    local string rhs
+    store rhs, %t2428
+    %t2429 = load program
+    %t2430 = field %t2429.exprs
+    %t2431 = load s
+    %t2432 = field %t2431.right
+    %t2433 = index %t2430[%t2432]
+    %t2434 = field %t2433.kind
+    %t2435 = const i64 12
+    %t2436 = eq %t2434, %t2435
+    %t2437 = load program
+    %t2438 = field %t2437.exprs
+    %t2439 = load s
+    %t2440 = field %t2439.right
+    %t2441 = index %t2438[%t2440]
+    %t2442 = field %t2441.args
+    %t2443 = call listLength(%t2442)
+    %t2444 = const i64 0
+    %t2445 = eq %t2443, %t2444
+    %t2446 = and %t2436, %t2445
+    branch %t2446 ? then630 : else631
+then630:
+    %t2447 = load lhs
+    store rhs, %t2447
+    jump endif632
+else631:
+    %t2448 = ref program
+    %t2449 = ref state
+    %t2450 = ref scope
+    %t2451 = load s
+    %t2452 = field %t2451.right
+    %t2453 = call checkExpr(%t2448, %t2449, %t2450, %t2452)
+    store rhs, %t2453
+    jump endif632
+endif632:
+    %t2454 = load lhs
+    %t2455 = load rhs
+    %t2456 = call assignableType(%t2454, %t2455)
+    %t2457 = not %t2456
+    branch %t2457 ? then633 : else634
+then633:
+    %t2458 = ref state
+    %t2459 = const string "cannot assign "
+    %t2460 = load rhs
+    %t2461 = add %t2459, %t2460
+    %t2462 = const string " to "
+    %t2463 = add %t2461, %t2462
+    %t2464 = load lhs
+    %t2465 = add %t2463, %t2464
+    %t2466 = call semanticFail(%t2458, %t2465)
+    jump endif635
+else634:
+    jump endif635
+endif635:
+    return
+    jump endif629
+else628:
+    jump endif629
+endif629:
+    %t2467 = load s
+    %t2468 = field %t2467.kind
+    %t2469 = const i64 5
+    %t2470 = eq %t2468, %t2469
+    branch %t2470 ? then636 : else637
+then636:
+    %t2471 = ref program
+    %t2472 = ref state
+    %t2473 = ref scope
+    %t2474 = load s
+    %t2475 = field %t2474.expr
+    %t2476 = call checkExpr(%t2471, %t2472, %t2473, %t2475)
+    local string cond
+    store cond, %t2476
+    %t2477 = load cond
+    %t2478 = const string "bool"
+    %t2479 = ne %t2477, %t2478
+    branch %t2479 ? then639 : else640
+then639:
+    %t2480 = ref state
+    %t2481 = const string "if condition must be bool"
+    %t2482 = call semanticFail(%t2480, %t2481)
+    return
+    jump endif641
+else640:
+    jump endif641
+endif641:
+    %t2483 = ref scope
+    %t2484 = call cloneBindings(%t2483)
+    local List<Binding> thenScope
+    store thenScope, %t2484
+    %t2485 = const i64 0
+    local i64 i
+    store i, %t2485
+    jump while642
+while642:
+    %t2486 = load i
+    %t2487 = load s
+    %t2488 = field %t2487.thenStmts
+    %t2489 = call listLength(%t2488)
+    %t2490 = lt %t2486, %t2489
+    branch %t2490 ? while_body643 : while_end644
+while_body643:
+    %t2491 = ref program
+    %t2492 = ref state
+    %t2493 = ref thenScope
+    %t2494 = load s
+    %t2495 = field %t2494.thenStmts
+    %t2496 = load i
+    %t2497 = index %t2495[%t2496]
+    %t2498 = load returnType
+    call checkStatement(%t2491, %t2492, %t2493, %t2497, %t2498)
+    %t2499 = load i
+    %t2500 = const i64 1
+    %t2501 = add %t2499, %t2500
+    store i, %t2501
+    jump while642
+while_end644:
+    %t2502 = ref scope
+    %t2503 = call cloneBindings(%t2502)
+    local List<Binding> elseScope
+    store elseScope, %t2503
+    %t2504 = const i64 0
+    store i, %t2504
+    jump while645
+while645:
+    %t2505 = load i
+    %t2506 = load s
+    %t2507 = field %t2506.elseStmts
+    %t2508 = call listLength(%t2507)
+    %t2509 = lt %t2505, %t2508
+    branch %t2509 ? while_body646 : while_end647
+while_body646:
+    %t2510 = ref program
+    %t2511 = ref state
+    %t2512 = ref elseScope
+    %t2513 = load s
+    %t2514 = field %t2513.elseStmts
+    %t2515 = load i
+    %t2516 = index %t2514[%t2515]
+    %t2517 = load returnType
+    call checkStatement(%t2510, %t2511, %t2512, %t2516, %t2517)
+    %t2518 = load i
+    %t2519 = const i64 1
+    %t2520 = add %t2518, %t2519
+    store i, %t2520
+    jump while645
+while_end647:
+    return
+    jump endif638
+else637:
+    jump endif638
+endif638:
+    %t2521 = load s
+    %t2522 = field %t2521.kind
+    %t2523 = const i64 6
+    %t2524 = eq %t2522, %t2523
+    branch %t2524 ? then648 : else649
+then648:
+    %t2525 = ref program
+    %t2526 = ref state
+    %t2527 = ref scope
+    %t2528 = load s
+    %t2529 = field %t2528.expr
+    %t2530 = call checkExpr(%t2525, %t2526, %t2527, %t2529)
+    local string cond
+    store cond, %t2530
+    %t2531 = load cond
+    %t2532 = const string "bool"
+    %t2533 = ne %t2531, %t2532
+    branch %t2533 ? then651 : else652
+then651:
+    %t2534 = ref state
+    %t2535 = const string "while condition must be bool"
+    %t2536 = call semanticFail(%t2534, %t2535)
+    return
+    jump endif653
+else652:
+    jump endif653
+endif653:
+    %t2537 = ref scope
+    %t2538 = call cloneBindings(%t2537)
+    local List<Binding> bodyScope
+    store bodyScope, %t2538
+    %t2539 = const i64 0
+    local i64 i
+    store i, %t2539
+    jump while654
+while654:
+    %t2540 = load i
+    %t2541 = load s
+    %t2542 = field %t2541.body
+    %t2543 = call listLength(%t2542)
+    %t2544 = lt %t2540, %t2543
+    branch %t2544 ? while_body655 : while_end656
+while_body655:
+    %t2545 = ref program
+    %t2546 = ref state
+    %t2547 = ref bodyScope
+    %t2548 = load s
+    %t2549 = field %t2548.body
+    %t2550 = load i
+    %t2551 = index %t2549[%t2550]
+    %t2552 = load returnType
+    call checkStatement(%t2545, %t2546, %t2547, %t2551, %t2552)
+    %t2553 = load i
+    %t2554 = const i64 1
+    %t2555 = add %t2553, %t2554
+    store i, %t2555
+    jump while654
+while_end656:
+    return
+    jump endif650
+else649:
+    jump endif650
+endif650:
+    %t2556 = ref state
+    %t2557 = const string "unsupported statement kind"
+    %t2558 = call semanticFail(%t2556, %t2557)
+endfunction
+function analyzeProgram(Ref<Program> program) -> i64
+entry:
+    %t2559 = new SemanticState
+    local SemanticState state
+    store state, %t2559
+    %t2560 = const bool true
+    field_set state.ok = %t2560
+    %t2561 = const string ""
+    field_set state.message = %t2561
+    %t2562 = const i64 0
+    local i64 i
+    store i, %t2562
+    jump while657
+while657:
+    %t2563 = load i
+    %t2564 = load program
+    %t2565 = field %t2564.structs
+    %t2566 = call listLength(%t2565)
+    %t2567 = lt %t2563, %t2566
+    branch %t2567 ? while_body658 : while_end659
+while_body658:
+    %t2568 = load program
+    %t2569 = field %t2568.structs
+    %t2570 = load i
+    %t2571 = index %t2569[%t2570]
+    local StructDef s
+    store s, %t2571
+    %t2572 = ref program
+    %t2573 = load s
+    %t2574 = field %t2573.name
+    %t2575 = call structIndex(%t2572, %t2574)
+    %t2576 = load i
+    %t2577 = ne %t2575, %t2576
+    branch %t2577 ? then660 : else661
+then660:
+    %t2578 = ref state
+    %t2579 = const string "duplicate struct "
+    %t2580 = load s
+    %t2581 = field %t2580.name
+    %t2582 = add %t2579, %t2581
+    %t2583 = call semanticFail(%t2578, %t2582)
+    %t2584 = const i64 1
+    return %t2584
+    jump endif662
+else661:
+    jump endif662
+endif662:
+    %t2585 = const i64 0
+    local i64 j
+    store j, %t2585
+    jump while663
+while663:
+    %t2586 = load j
+    %t2587 = load s
+    %t2588 = field %t2587.fields
+    %t2589 = call listLength(%t2588)
+    %t2590 = lt %t2586, %t2589
+    branch %t2590 ? while_body664 : while_end665
+while_body664:
+    %t2591 = load s
+    %t2592 = field %t2591.fields
+    %t2593 = load j
+    %t2594 = index %t2592[%t2593]
+    local Field field
+    store field, %t2594
+    %t2595 = load s
+    %t2596 = load field
+    %t2597 = field %t2596.name
+    %t2598 = call fieldIndex(%t2595, %t2597)
+    %t2599 = load j
+    %t2600 = ne %t2598, %t2599
+    branch %t2600 ? then666 : else667
+then666:
+    %t2601 = ref state
+    %t2602 = const string "duplicate field "
+    %t2603 = load s
+    %t2604 = field %t2603.name
+    %t2605 = add %t2602, %t2604
+    %t2606 = const string "."
+    %t2607 = add %t2605, %t2606
+    %t2608 = load field
+    %t2609 = field %t2608.name
+    %t2610 = add %t2607, %t2609
+    %t2611 = call semanticFail(%t2601, %t2610)
+    %t2612 = const i64 1
+    return %t2612
+    jump endif668
+else667:
+    jump endif668
+endif668:
+    %t2613 = ref program
+    %t2614 = ref state
+    %t2615 = load field
+    %t2616 = field %t2615.type
+    %t2617 = const bool false
+    %t2618 = call validateType(%t2613, %t2614, %t2616, %t2617)
+    %t2619 = not %t2618
+    branch %t2619 ? then669 : else670
+then669:
+    %t2620 = const i64 1
+    return %t2620
+    jump endif671
+else670:
+    jump endif671
+endif671:
+    %t2621 = load j
+    %t2622 = const i64 1
+    %t2623 = add %t2621, %t2622
+    store j, %t2623
+    jump while663
+while_end665:
+    %t2624 = load i
+    %t2625 = const i64 1
+    %t2626 = add %t2624, %t2625
+    store i, %t2626
+    jump while657
+while_end659:
+    %t2627 = const i64 0
+    store i, %t2627
+    jump while672
+while672:
+    %t2628 = load i
+    %t2629 = load program
+    %t2630 = field %t2629.functions
+    %t2631 = call listLength(%t2630)
+    %t2632 = lt %t2628, %t2631
+    branch %t2632 ? while_body673 : while_end674
+while_body673:
+    %t2633 = load program
+    %t2634 = field %t2633.functions
+    %t2635 = load i
+    %t2636 = index %t2634[%t2635]
+    local FunctionDef f
+    store f, %t2636
+    %t2637 = ref program
+    %t2638 = load f
+    %t2639 = field %t2638.name
+    %t2640 = call functionIndex(%t2637, %t2639)
+    %t2641 = load i
+    %t2642 = ne %t2640, %t2641
+    branch %t2642 ? then675 : else676
+then675:
+    %t2643 = ref state
+    %t2644 = const string "duplicate function "
+    %t2645 = load f
+    %t2646 = field %t2645.name
+    %t2647 = add %t2644, %t2646
+    %t2648 = call semanticFail(%t2643, %t2647)
+    %t2649 = const i64 1
+    return %t2649
+    jump endif677
+else676:
+    jump endif677
+endif677:
+    %t2650 = ref program
+    %t2651 = ref state
+    %t2652 = load f
+    %t2653 = field %t2652.returnType
+    %t2654 = const bool true
+    %t2655 = call validateType(%t2650, %t2651, %t2653, %t2654)
+    %t2656 = not %t2655
+    branch %t2656 ? then678 : else679
+then678:
+    %t2657 = const i64 1
+    return %t2657
+    jump endif680
+else679:
+    jump endif680
+endif680:
+    %t2658 = const i64 0
+    local i64 j
+    store j, %t2658
+    jump while681
+while681:
+    %t2659 = load j
+    %t2660 = load f
+    %t2661 = field %t2660.params
+    %t2662 = call listLength(%t2661)
+    %t2663 = lt %t2659, %t2662
+    branch %t2663 ? while_body682 : while_end683
+while_body682:
+    %t2664 = load f
+    %t2665 = field %t2664.params
+    %t2666 = load j
+    %t2667 = index %t2665[%t2666]
+    local Param p
+    store p, %t2667
+    %t2668 = const i64 0
+    local i64 k
+    store k, %t2668
+    jump while684
+while684:
+    %t2669 = load k
+    %t2670 = load j
+    %t2671 = lt %t2669, %t2670
+    branch %t2671 ? while_body685 : while_end686
+while_body685:
+    %t2672 = load f
+    %t2673 = field %t2672.params
+    %t2674 = load k
+    %t2675 = index %t2673[%t2674]
+    %t2676 = field %t2675.name
+    %t2677 = load p
+    %t2678 = field %t2677.name
+    %t2679 = eq %t2676, %t2678
+    branch %t2679 ? then687 : else688
+then687:
+    %t2680 = ref state
+    %t2681 = const string "duplicate parameter "
+    %t2682 = load p
+    %t2683 = field %t2682.name
+    %t2684 = add %t2681, %t2683
+    %t2685 = call semanticFail(%t2680, %t2684)
+    %t2686 = const i64 1
+    return %t2686
+    jump endif689
+else688:
+    jump endif689
+endif689:
+    %t2687 = load k
+    %t2688 = const i64 1
+    %t2689 = add %t2687, %t2688
+    store k, %t2689
+    jump while684
+while_end686:
+    %t2690 = ref program
+    %t2691 = ref state
+    %t2692 = load p
+    %t2693 = field %t2692.type
+    %t2694 = const bool false
+    %t2695 = call validateType(%t2690, %t2691, %t2693, %t2694)
+    %t2696 = not %t2695
+    branch %t2696 ? then690 : else691
+then690:
+    %t2697 = const i64 1
+    return %t2697
+    jump endif692
+else691:
+    jump endif692
+endif692:
+    %t2698 = load j
+    %t2699 = const i64 1
+    %t2700 = add %t2698, %t2699
+    store j, %t2700
+    jump while681
+while_end683:
+    %t2701 = load i
+    %t2702 = const i64 1
+    %t2703 = add %t2701, %t2702
+    store i, %t2703
+    jump while672
+while_end674:
+    %t2704 = ref program
+    %t2705 = const string "main"
+    %t2706 = call functionIndex(%t2704, %t2705)
+    %t2707 = const i64 0
+    %t2708 = lt %t2706, %t2707
+    branch %t2708 ? then693 : else694
+then693:
+    %t2709 = ref state
+    %t2710 = const string "entry function main is required"
+    %t2711 = call semanticFail(%t2709, %t2710)
+    %t2712 = const i64 1
+    return %t2712
+    jump endif695
+else694:
+    jump endif695
+endif695:
+    %t2713 = ref program
+    %t2714 = const string "main"
+    %t2715 = call functionIndex(%t2713, %t2714)
+    local i64 mainIndex
+    store mainIndex, %t2715
+    %t2716 = load program
+    %t2717 = field %t2716.functions
+    %t2718 = load mainIndex
+    %t2719 = index %t2717[%t2718]
+    %t2720 = field %t2719.returnType
+    %t2721 = const string "i64"
+    %t2722 = ne %t2720, %t2721
+    branch %t2722 ? then696 : else697
+then696:
+    %t2723 = ref state
+    %t2724 = const string "main must return i64"
+    %t2725 = call semanticFail(%t2723, %t2724)
+    %t2726 = const i64 1
+    return %t2726
+    jump endif698
+else697:
+    jump endif698
+endif698:
+    %t2727 = const i64 0
+    store i, %t2727
+    jump while699
+while699:
+    %t2728 = load i
+    %t2729 = load program
+    %t2730 = field %t2729.functions
+    %t2731 = call listLength(%t2730)
+    %t2732 = lt %t2728, %t2731
+    branch %t2732 ? while_body700 : while_end701
+while_body700:
+    %t2733 = load program
+    %t2734 = field %t2733.functions
+    %t2735 = load i
+    %t2736 = index %t2734[%t2735]
+    local FunctionDef f
+    store f, %t2736
+    %t2737 = list()
+    local List<Binding> scope
+    store scope, %t2737
+    %t2738 = const i64 0
+    local i64 j
+    store j, %t2738
+    jump while702
+while702:
+    %t2739 = load j
+    %t2740 = load f
+    %t2741 = field %t2740.params
+    %t2742 = call listLength(%t2741)
+    %t2743 = lt %t2739, %t2742
+    branch %t2743 ? while_body703 : while_end704
+while_body703:
+    %t2744 = new Binding
+    local Binding b
+    store b, %t2744
+    %t2745 = load f
+    %t2746 = field %t2745.params
+    %t2747 = load j
+    %t2748 = index %t2746[%t2747]
+    %t2749 = field %t2748.name
+    field_set b.name = %t2749
+    %t2750 = load f
+    %t2751 = field %t2750.params
+    %t2752 = load j
+    %t2753 = index %t2751[%t2752]
+    %t2754 = field %t2753.type
+    %t2755 = call valueTypeForParam(%t2754)
+    field_set b.type = %t2755
+    %t2756 = ref scope
+    %t2757 = load b
+    call push(%t2756, %t2757)
+    %t2758 = load j
+    %t2759 = const i64 1
+    %t2760 = add %t2758, %t2759
+    store j, %t2760
+    jump while702
+while_end704:
+    %t2761 = const i64 0
+    store j, %t2761
+    jump while705
+while705:
+    %t2762 = load j
+    %t2763 = load f
+    %t2764 = field %t2763.body
+    %t2765 = call listLength(%t2764)
+    %t2766 = lt %t2762, %t2765
+    branch %t2766 ? while_body706 : while_end707
+while_body706:
+    %t2767 = ref program
+    %t2768 = ref state
+    %t2769 = ref scope
+    %t2770 = load f
+    %t2771 = field %t2770.body
+    %t2772 = load j
+    %t2773 = index %t2771[%t2772]
+    %t2774 = load f
+    %t2775 = field %t2774.returnType
+    call checkStatement(%t2767, %t2768, %t2769, %t2773, %t2775)
+    %t2776 = load state
+    %t2777 = field %t2776.ok
+    %t2778 = not %t2777
+    branch %t2778 ? then708 : else709
+then708:
+    %t2779 = const i64 1
+    return %t2779
+    jump endif710
+else709:
+    jump endif710
+endif710:
+    %t2780 = load j
+    %t2781 = const i64 1
+    %t2782 = add %t2780, %t2781
+    store j, %t2782
+    jump while705
+while_end707:
+    %t2783 = load i
+    %t2784 = const i64 1
+    %t2785 = add %t2783, %t2784
+    store i, %t2785
+    jump while699
+while_end701:
+    %t2786 = const i64 0
+    return %t2786
+endfunction
+function emitLine(Ref<EmitState> state, string line) -> void
+entry:
+    %t2787 = ref state
+    %t2788 = ref_field %t2787.lines
+    %t2789 = load line
+    call push(%t2788, %t2789)
+endfunction
+function newTemp(Ref<EmitState> state) -> string
+entry:
+    %t2790 = const string "%t"
+    %t2791 = load state
+    %t2792 = field %t2791.temp
+    %t2793 = call int_to_string(%t2792)
+    %t2794 = add %t2790, %t2793
+    local string t
+    store t, %t2794
+    %t2795 = load state
+    %t2796 = field %t2795.temp
+    %t2797 = const i64 1
+    %t2798 = add %t2796, %t2797
+    field_set state.temp = %t2798
+    %t2799 = load t
+    return %t2799
+endfunction
+function newLabel(Ref<EmitState> state, string prefix) -> string
+entry:
+    %t2800 = load prefix
+    %t2801 = load state
+    %t2802 = field %t2801.label
+    %t2803 = call int_to_string(%t2802)
+    %t2804 = add %t2800, %t2803
+    local string t
+    store t, %t2804
+    %t2805 = load state
+    %t2806 = field %t2805.label
+    %t2807 = const i64 1
+    %t2808 = add %t2806, %t2807
+    field_set state.label = %t2808
+    %t2809 = load t
+    return %t2809
+endfunction
+function canonicalBinary(string op) -> string
+entry:
+    %t2810 = load op
+    %t2811 = const string "+"
+    %t2812 = eq %t2810, %t2811
+    branch %t2812 ? then711 : else712
+then711:
+    %t2813 = const string "add"
+    return %t2813
+    jump endif713
+else712:
+    jump endif713
+endif713:
+    %t2814 = load op
+    %t2815 = const string "-"
+    %t2816 = eq %t2814, %t2815
+    branch %t2816 ? then714 : else715
+then714:
+    %t2817 = const string "sub"
+    return %t2817
+    jump endif716
+else715:
+    jump endif716
+endif716:
+    %t2818 = load op
+    %t2819 = const string "*"
+    %t2820 = eq %t2818, %t2819
+    branch %t2820 ? then717 : else718
+then717:
+    %t2821 = const string "mul"
+    return %t2821
+    jump endif719
+else718:
+    jump endif719
+endif719:
+    %t2822 = load op
+    %t2823 = const string "/"
+    %t2824 = eq %t2822, %t2823
+    branch %t2824 ? then720 : else721
+then720:
+    %t2825 = const string "div"
+    return %t2825
+    jump endif722
+else721:
+    jump endif722
+endif722:
+    %t2826 = load op
+    %t2827 = const string "%"
+    %t2828 = eq %t2826, %t2827
+    branch %t2828 ? then723 : else724
+then723:
+    %t2829 = const string "mod"
+    return %t2829
+    jump endif725
+else724:
+    jump endif725
+endif725:
+    %t2830 = load op
+    %t2831 = const string "=="
+    %t2832 = eq %t2830, %t2831
+    branch %t2832 ? then726 : else727
+then726:
+    %t2833 = const string "eq"
+    return %t2833
+    jump endif728
+else727:
+    jump endif728
+endif728:
+    %t2834 = load op
+    %t2835 = const string "!="
+    %t2836 = eq %t2834, %t2835
+    branch %t2836 ? then729 : else730
+then729:
+    %t2837 = const string "ne"
+    return %t2837
+    jump endif731
+else730:
+    jump endif731
+endif731:
+    %t2838 = load op
+    %t2839 = const string "<"
+    %t2840 = eq %t2838, %t2839
+    branch %t2840 ? then732 : else733
+then732:
+    %t2841 = const string "lt"
+    return %t2841
+    jump endif734
+else733:
+    jump endif734
+endif734:
+    %t2842 = load op
+    %t2843 = const string "<="
+    %t2844 = eq %t2842, %t2843
+    branch %t2844 ? then735 : else736
+then735:
+    %t2845 = const string "le"
+    return %t2845
+    jump endif737
+else736:
+    jump endif737
+endif737:
+    %t2846 = load op
+    %t2847 = const string ">"
+    %t2848 = eq %t2846, %t2847
+    branch %t2848 ? then738 : else739
+then738:
+    %t2849 = const string "gt"
+    return %t2849
+    jump endif740
+else739:
+    jump endif740
+endif740:
+    %t2850 = load op
+    %t2851 = const string ">="
+    %t2852 = eq %t2850, %t2851
+    branch %t2852 ? then741 : else742
+then741:
+    %t2853 = const string "ge"
+    return %t2853
+    jump endif743
+else742:
+    jump endif743
+endif743:
+    %t2854 = load op
+    %t2855 = const string "&&"
+    %t2856 = eq %t2854, %t2855
+    branch %t2856 ? then744 : else745
+then744:
+    %t2857 = const string "and"
+    return %t2857
+    jump endif746
+else745:
+    jump endif746
+endif746:
+    %t2858 = load op
+    %t2859 = const string "||"
+    %t2860 = eq %t2858, %t2859
+    branch %t2860 ? then747 : else748
+then747:
+    %t2861 = const string "or"
+    return %t2861
+    jump endif749
+else748:
+    jump endif749
+endif749:
+    %t2862 = load op
+    return %t2862
+endfunction
+function canonicalUnary(string op) -> string
+entry:
+    %t2863 = load op
+    %t2864 = const string "-"
+    %t2865 = eq %t2863, %t2864
+    branch %t2865 ? then750 : else751
+then750:
+    %t2866 = const string "neg"
+    return %t2866
+    jump endif752
+else751:
+    jump endif752
+endif752:
+    %t2867 = load op
+    %t2868 = const string "!"
+    %t2869 = eq %t2867, %t2868
+    branch %t2869 ? then753 : else754
+then753:
+    %t2870 = const string "not"
+    return %t2870
+    jump endif755
+else754:
+    jump endif755
+endif755:
+    %t2871 = load op
+    %t2872 = const string "+"
+    %t2873 = eq %t2871, %t2872
+    branch %t2873 ? then756 : else757
+then756:
+    %t2874 = const string "pos"
+    return %t2874
+    jump endif758
+else757:
+    jump endif758
+endif758:
+    %t2875 = load op
+    return %t2875
+endfunction
+function escapeString(string value) -> string
+entry:
+    %t2876 = const string ""
+    local string out
+    store out, %t2876
+    %t2877 = const i64 0
+    local i64 i
+    store i, %t2877
+    jump while759
+while759:
+    %t2878 = load i
+    %t2879 = load value
+    %t2880 = call length(%t2879)
+    %t2881 = lt %t2878, %t2880
+    branch %t2881 ? while_body760 : while_end761
+while_body760:
+    %t2882 = load value
+    %t2883 = load i
+    %t2884 = index %t2882[%t2883]
+    local i64 c
+    store c, %t2884
+    %t2885 = load c
+    %t2886 = const i64 92
+    %t2887 = eq %t2885, %t2886
+    branch %t2887 ? then762 : else763
+then762:
+    %t2888 = load out
+    %t2889 = const string "\\\\"
+    %t2890 = add %t2888, %t2889
+    store out, %t2890
+    jump endif764
+else763:
+    %t2891 = load c
+    %t2892 = const i64 10
+    %t2893 = eq %t2891, %t2892
+    branch %t2893 ? then765 : else766
+then765:
+    %t2894 = load out
+    %t2895 = const string "\\n"
+    %t2896 = add %t2894, %t2895
+    store out, %t2896
+    jump endif767
+else766:
+    %t2897 = load c
+    %t2898 = const i64 13
+    %t2899 = eq %t2897, %t2898
+    branch %t2899 ? then768 : else769
+then768:
+    %t2900 = load out
+    %t2901 = const string "\\r"
+    %t2902 = add %t2900, %t2901
+    store out, %t2902
+    jump endif770
+else769:
+    %t2903 = load c
+    %t2904 = const i64 9
+    %t2905 = eq %t2903, %t2904
+    branch %t2905 ? then771 : else772
+then771:
+    %t2906 = load out
+    %t2907 = const string "\\t"
+    %t2908 = add %t2906, %t2907
+    store out, %t2908
+    jump endif773
+else772:
+    %t2909 = load c
+    %t2910 = const i64 34
+    %t2911 = eq %t2909, %t2910
+    branch %t2911 ? then774 : else775
+then774:
+    %t2912 = load out
+    %t2913 = const string "\\\""
+    %t2914 = add %t2912, %t2913
+    store out, %t2914
+    jump endif776
+else775:
+    %t2915 = load out
+    %t2916 = load value
+    %t2917 = load i
+    %t2918 = load i
+    %t2919 = const i64 1
+    %t2920 = add %t2918, %t2919
+    %t2921 = call slice(%t2916, %t2917, %t2920)
+    %t2922 = add %t2915, %t2921
+    store out, %t2922
+    jump endif776
+endif776:
+    jump endif773
+endif773:
+    jump endif770
+endif770:
+    jump endif767
+endif767:
+    jump endif764
+endif764:
+    %t2923 = load i
+    %t2924 = const i64 1
+    %t2925 = add %t2923, %t2924
+    store i, %t2925
+    jump while759
+while_end761:
+    %t2926 = load out
+    return %t2926
+endfunction
+function isRefType(string type) -> bool
+entry:
+    %t2927 = load type
+    %t2928 = const string "Ref<"
+    %t2929 = call innerGeneric(%t2927, %t2928)
+    %t2930 = const string ""
+    %t2931 = ne %t2929, %t2930
+    return %t2931
+endfunction
+function isLValue(Ref<Program> program, i64 id) -> bool
+entry:
+    %t2932 = load id
+    %t2933 = const i64 0
+    %t2934 = lt %t2932, %t2933
+    %t2935 = load id
+    %t2936 = load program
+    %t2937 = field %t2936.exprs
+    %t2938 = call listLength(%t2937)
+    %t2939 = ge %t2935, %t2938
+    %t2940 = or %t2934, %t2939
+    branch %t2940 ? then777 : else778
+then777:
+    %t2941 = const bool false
+    return %t2941
+    jump endif779
+else778:
+    jump endif779
+endif779:
+    %t2942 = load program
+    %t2943 = field %t2942.exprs
+    %t2944 = load id
+    %t2945 = index %t2943[%t2944]
+    local Expr x
+    store x, %t2945
+    %t2946 = load x
+    %t2947 = field %t2946.kind
+    %t2948 = const i64 5
+    %t2949 = eq %t2947, %t2948
+    branch %t2949 ? then780 : else781
+then780:
+    %t2950 = const bool true
+    return %t2950
+    jump endif782
+else781:
+    jump endif782
+endif782:
+    %t2951 = load x
+    %t2952 = field %t2951.kind
+    %t2953 = const i64 9
+    %t2954 = eq %t2952, %t2953
+    %t2955 = load x
+    %t2956 = field %t2955.kind
+    %t2957 = const i64 10
+    %t2958 = eq %t2956, %t2957
+    %t2959 = or %t2954, %t2958
+    branch %t2959 ? then783 : else784
+then783:
+    %t2960 = ref program
+    %t2961 = load x
+    %t2962 = field %t2961.left
+    %t2963 = call isLValue(%t2960, %t2962)
+    return %t2963
+    jump endif785
+else784:
+    jump endif785
+endif785:
+    %t2964 = const bool false
+    return %t2964
+endfunction
+function emitPlace(Ref<EmitState> state, Ref<Program> program, i64 id) -> string
+entry:
+    %t2965 = load program
+    %t2966 = field %t2965.exprs
+    %t2967 = load id
+    %t2968 = index %t2966[%t2967]
+    local Expr x
+    store x, %t2968
+    %t2969 = load x
+    %t2970 = field %t2969.kind
+    %t2971 = const i64 5
+    %t2972 = eq %t2970, %t2971
+    branch %t2972 ? then786 : else787
+then786:
+    %t2973 = ref state
+    %t2974 = call newTemp(%t2973)
+    local string t
+    store t, %t2974
+    %t2975 = ref state
+    %t2976 = const string "    "
+    %t2977 = load t
+    %t2978 = add %t2976, %t2977
+    %t2979 = const string " = ref "
+    %t2980 = add %t2978, %t2979
+    %t2981 = load x
+    %t2982 = field %t2981.text
+    %t2983 = add %t2980, %t2982
+    call emitLine(%t2975, %t2983)
+    %t2984 = load t
+    return %t2984
+    jump endif788
+else787:
+    jump endif788
+endif788:
+    %t2985 = load x
+    %t2986 = field %t2985.kind
+    %t2987 = const i64 9
+    %t2988 = eq %t2986, %t2987
+    branch %t2988 ? then789 : else790
+then789:
+    %t2989 = ref state
+    %t2990 = ref program
+    %t2991 = load x
+    %t2992 = field %t2991.left
+    %t2993 = call emitPlace(%t2989, %t2990, %t2992)
+    local string base
+    store base, %t2993
+    %t2994 = ref state
+    %t2995 = call newTemp(%t2994)
+    local string t
+    store t, %t2995
+    %t2996 = ref state
+    %t2997 = const string "    "
+    %t2998 = load t
+    %t2999 = add %t2997, %t2998
+    %t3000 = const string " = ref_field "
+    %t3001 = add %t2999, %t3000
+    %t3002 = load base
+    %t3003 = add %t3001, %t3002
+    %t3004 = const string "."
+    %t3005 = add %t3003, %t3004
+    %t3006 = load x
+    %t3007 = field %t3006.text
+    %t3008 = add %t3005, %t3007
+    call emitLine(%t2996, %t3008)
+    %t3009 = load t
+    return %t3009
+    jump endif791
+else790:
+    jump endif791
+endif791:
+    %t3010 = load x
+    %t3011 = field %t3010.kind
+    %t3012 = const i64 10
+    %t3013 = eq %t3011, %t3012
+    branch %t3013 ? then792 : else793
+then792:
+    %t3014 = ref state
+    %t3015 = ref program
+    %t3016 = load x
+    %t3017 = field %t3016.left
+    %t3018 = call emitPlace(%t3014, %t3015, %t3017)
+    local string base
+    store base, %t3018
+    %t3019 = ref state
+    %t3020 = ref program
+    %t3021 = load x
+    %t3022 = field %t3021.right
+    %t3023 = call emitExpr(%t3019, %t3020, %t3022)
+    local string idx
+    store idx, %t3023
+    %t3024 = ref state
+    %t3025 = call newTemp(%t3024)
+    local string t
+    store t, %t3025
+    %t3026 = ref state
+    %t3027 = const string "    "
+    %t3028 = load t
+    %t3029 = add %t3027, %t3028
+    %t3030 = const string " = ref_index "
+    %t3031 = add %t3029, %t3030
+    %t3032 = load base
+    %t3033 = add %t3031, %t3032
+    %t3034 = const string "["
+    %t3035 = add %t3033, %t3034
+    %t3036 = load idx
+    %t3037 = add %t3035, %t3036
+    %t3038 = const string "]"
+    %t3039 = add %t3037, %t3038
+    call emitLine(%t3026, %t3039)
+    %t3040 = load t
+    return %t3040
+    jump endif794
+else793:
+    jump endif794
+endif794:
+    %t3041 = const string "%invalid"
+    return %t3041
+endfunction
+function callNeedsRef(Ref<Program> program, string callee, i64 index) -> bool
+entry:
+    %t3042 = load callee
+    %t3043 = const string "push"
+    %t3044 = eq %t3042, %t3043
+    %t3045 = load index
+    %t3046 = const i64 0
+    %t3047 = eq %t3045, %t3046
+    %t3048 = and %t3044, %t3047
+    branch %t3048 ? then795 : else796
+then795:
+    %t3049 = const bool true
+    return %t3049
+    jump endif797
+else796:
+    jump endif797
+endif797:
+    %t3050 = ref program
+    %t3051 = load callee
+    %t3052 = call functionIndex(%t3050, %t3051)
+    local i64 fi
+    store fi, %t3052
+    %t3053 = load fi
+    %t3054 = const i64 0
+    %t3055 = lt %t3053, %t3054
+    branch %t3055 ? then798 : else799
+then798:
+    %t3056 = const bool false
+    return %t3056
+    jump endif800
+else799:
+    jump endif800
+endif800:
+    %t3057 = load program
+    %t3058 = field %t3057.functions
+    %t3059 = load fi
+    %t3060 = index %t3058[%t3059]
+    local FunctionDef fn
+    store fn, %t3060
+    %t3061 = load index
+    %t3062 = const i64 0
+    %t3063 = lt %t3061, %t3062
+    %t3064 = load index
+    %t3065 = load fn
+    %t3066 = field %t3065.params
+    %t3067 = call listLength(%t3066)
+    %t3068 = ge %t3064, %t3067
+    %t3069 = or %t3063, %t3068
+    branch %t3069 ? then801 : else802
+then801:
+    %t3070 = const bool false
+    return %t3070
+    jump endif803
+else802:
+    jump endif803
+endif803:
+    %t3071 = load fn
+    %t3072 = field %t3071.params
+    %t3073 = load index
+    %t3074 = index %t3072[%t3073]
+    %t3075 = field %t3074.type
+    %t3076 = call isRefType(%t3075)
+    return %t3076
+endfunction
+function emitExpr(Ref<EmitState> state, Ref<Program> program, i64 id) -> string
+entry:
+    %t3077 = load program
+    %t3078 = field %t3077.exprs
+    %t3079 = load id
+    %t3080 = index %t3078[%t3079]
+    local Expr x
+    store x, %t3080
+    %t3081 = load x
+    %t3082 = field %t3081.kind
+    %t3083 = const i64 1
+    %t3084 = eq %t3082, %t3083
+    branch %t3084 ? then804 : else805
+then804:
+    %t3085 = ref state
+    %t3086 = call newTemp(%t3085)
+    local string t
+    store t, %t3086
+    %t3087 = ref state
+    %t3088 = const string "    "
+    %t3089 = load t
+    %t3090 = add %t3088, %t3089
+    %t3091 = const string " = const i64 "
+    %t3092 = add %t3090, %t3091
+    %t3093 = load x
+    %t3094 = field %t3093.valueText
+    %t3095 = add %t3092, %t3094
+    call emitLine(%t3087, %t3095)
+    %t3096 = load t
+    return %t3096
+    jump endif806
+else805:
+    jump endif806
+endif806:
+    %t3097 = load x
+    %t3098 = field %t3097.kind
+    %t3099 = const i64 2
+    %t3100 = eq %t3098, %t3099
+    branch %t3100 ? then807 : else808
+then807:
+    %t3101 = ref state
+    %t3102 = call newTemp(%t3101)
+    local string t
+    store t, %t3102
+    %t3103 = ref state
+    %t3104 = const string "    "
+    %t3105 = load t
+    %t3106 = add %t3104, %t3105
+    %t3107 = const string " = const string \""
+    %t3108 = add %t3106, %t3107
+    %t3109 = load x
+    %t3110 = field %t3109.text
+    %t3111 = call escapeString(%t3110)
+    %t3112 = add %t3108, %t3111
+    %t3113 = const string "\""
+    %t3114 = add %t3112, %t3113
+    call emitLine(%t3103, %t3114)
+    %t3115 = load t
+    return %t3115
+    jump endif809
+else808:
+    jump endif809
+endif809:
+    %t3116 = load x
+    %t3117 = field %t3116.kind
+    %t3118 = const i64 3
+    %t3119 = eq %t3117, %t3118
+    branch %t3119 ? then810 : else811
+then810:
+    %t3120 = ref state
+    %t3121 = call newTemp(%t3120)
+    local string t
+    store t, %t3121
+    %t3122 = ref state
+    %t3123 = const string "    "
+    %t3124 = load t
+    %t3125 = add %t3123, %t3124
+    %t3126 = const string " = const char "
+    %t3127 = add %t3125, %t3126
+    %t3128 = load x
+    %t3129 = field %t3128.valueText
+    %t3130 = add %t3127, %t3129
+    call emitLine(%t3122, %t3130)
+    %t3131 = load t
+    return %t3131
+    jump endif812
+else811:
+    jump endif812
+endif812:
+    %t3132 = load x
+    %t3133 = field %t3132.kind
+    %t3134 = const i64 4
+    %t3135 = eq %t3133, %t3134
+    branch %t3135 ? then813 : else814
+then813:
+    %t3136 = ref state
+    %t3137 = call newTemp(%t3136)
+    local string t
+    store t, %t3137
+    %t3138 = ref state
+    %t3139 = const string "    "
+    %t3140 = load t
+    %t3141 = add %t3139, %t3140
+    %t3142 = const string " = const bool "
+    %t3143 = add %t3141, %t3142
+    %t3144 = load x
+    %t3145 = field %t3144.valueText
+    %t3146 = add %t3143, %t3145
+    call emitLine(%t3138, %t3146)
+    %t3147 = load t
+    return %t3147
+    jump endif815
+else814:
+    jump endif815
+endif815:
+    %t3148 = load x
+    %t3149 = field %t3148.kind
+    %t3150 = const i64 5
+    %t3151 = eq %t3149, %t3150
+    branch %t3151 ? then816 : else817
+then816:
+    %t3152 = ref state
+    %t3153 = call newTemp(%t3152)
+    local string t
+    store t, %t3153
+    %t3154 = ref state
+    %t3155 = const string "    "
+    %t3156 = load t
+    %t3157 = add %t3155, %t3156
+    %t3158 = const string " = load "
+    %t3159 = add %t3157, %t3158
+    %t3160 = load x
+    %t3161 = field %t3160.text
+    %t3162 = add %t3159, %t3161
+    call emitLine(%t3154, %t3162)
+    %t3163 = load t
+    return %t3163
+    jump endif818
+else817:
+    jump endif818
+endif818:
+    %t3164 = load x
+    %t3165 = field %t3164.kind
+    %t3166 = const i64 7
+    %t3167 = eq %t3165, %t3166
+    branch %t3167 ? then819 : else820
+then819:
+    %t3168 = ref state
+    %t3169 = ref program
+    %t3170 = load x
+    %t3171 = field %t3170.left
+    %t3172 = call emitExpr(%t3168, %t3169, %t3171)
+    local string a
+    store a, %t3172
+    %t3173 = ref state
+    %t3174 = call newTemp(%t3173)
+    local string t
+    store t, %t3174
+    %t3175 = ref state
+    %t3176 = const string "    "
+    %t3177 = load t
+    %t3178 = add %t3176, %t3177
+    %t3179 = const string " = "
+    %t3180 = add %t3178, %t3179
+    %t3181 = load x
+    %t3182 = field %t3181.op
+    %t3183 = call canonicalUnary(%t3182)
+    %t3184 = add %t3180, %t3183
+    %t3185 = const string " "
+    %t3186 = add %t3184, %t3185
+    %t3187 = load a
+    %t3188 = add %t3186, %t3187
+    call emitLine(%t3175, %t3188)
+    %t3189 = load t
+    return %t3189
+    jump endif821
+else820:
+    jump endif821
+endif821:
+    %t3190 = load x
+    %t3191 = field %t3190.kind
+    %t3192 = const i64 6
+    %t3193 = eq %t3191, %t3192
+    branch %t3193 ? then822 : else823
+then822:
+    %t3194 = ref state
+    %t3195 = ref program
+    %t3196 = load x
+    %t3197 = field %t3196.left
+    %t3198 = call emitExpr(%t3194, %t3195, %t3197)
+    local string a
+    store a, %t3198
+    %t3199 = ref state
+    %t3200 = ref program
+    %t3201 = load x
+    %t3202 = field %t3201.right
+    %t3203 = call emitExpr(%t3199, %t3200, %t3202)
+    local string b
+    store b, %t3203
+    %t3204 = ref state
+    %t3205 = call newTemp(%t3204)
+    local string t
+    store t, %t3205
+    %t3206 = ref state
+    %t3207 = const string "    "
+    %t3208 = load t
+    %t3209 = add %t3207, %t3208
+    %t3210 = const string " = "
+    %t3211 = add %t3209, %t3210
+    %t3212 = load x
+    %t3213 = field %t3212.op
+    %t3214 = call canonicalBinary(%t3213)
+    %t3215 = add %t3211, %t3214
+    %t3216 = const string " "
+    %t3217 = add %t3215, %t3216
+    %t3218 = load a
+    %t3219 = add %t3217, %t3218
+    %t3220 = const string ", "
+    %t3221 = add %t3219, %t3220
+    %t3222 = load b
+    %t3223 = add %t3221, %t3222
+    call emitLine(%t3206, %t3223)
+    %t3224 = load t
+    return %t3224
+    jump endif824
+else823:
+    jump endif824
+endif824:
+    %t3225 = load x
+    %t3226 = field %t3225.kind
+    %t3227 = const i64 8
+    %t3228 = eq %t3226, %t3227
+    branch %t3228 ? then825 : else826
+then825:
+    %t3229 = load program
+    %t3230 = field %t3229.exprs
+    %t3231 = load x
+    %t3232 = field %t3231.left
+    %t3233 = index %t3230[%t3232]
+    %t3234 = field %t3233.text
+    local string callee
+    store callee, %t3234
+    %t3235 = const string ""
+    local string args
+    store args, %t3235
+    %t3236 = const i64 0
+    local i64 i
+    store i, %t3236
+    jump while828
+while828:
+    %t3237 = load i
+    %t3238 = load x
+    %t3239 = field %t3238.args
+    %t3240 = call listLength(%t3239)
+    %t3241 = lt %t3237, %t3240
+    branch %t3241 ? while_body829 : while_end830
+while_body829:
+    %t3242 = load i
+    %t3243 = const i64 0
+    %t3244 = gt %t3242, %t3243
+    branch %t3244 ? then831 : else832
+then831:
+    %t3245 = load args
+    %t3246 = const string ", "
+    %t3247 = add %t3245, %t3246
+    store args, %t3247
+    jump endif833
+else832:
+    jump endif833
+endif833:
+    %t3248 = ref program
+    %t3249 = load callee
+    %t3250 = load i
+    %t3251 = call callNeedsRef(%t3248, %t3249, %t3250)
+    branch %t3251 ? then834 : else835
+then834:
+    %t3252 = load args
+    %t3253 = ref state
+    %t3254 = ref program
+    %t3255 = load x
+    %t3256 = field %t3255.args
+    %t3257 = load i
+    %t3258 = index %t3256[%t3257]
+    %t3259 = call emitPlace(%t3253, %t3254, %t3258)
+    %t3260 = add %t3252, %t3259
+    store args, %t3260
+    jump endif836
+else835:
+    %t3261 = load args
+    %t3262 = ref state
+    %t3263 = ref program
+    %t3264 = load x
+    %t3265 = field %t3264.args
+    %t3266 = load i
+    %t3267 = index %t3265[%t3266]
+    %t3268 = call emitExpr(%t3262, %t3263, %t3267)
+    %t3269 = add %t3261, %t3268
+    store args, %t3269
+    jump endif836
+endif836:
+    %t3270 = load i
+    %t3271 = const i64 1
+    %t3272 = add %t3270, %t3271
+    store i, %t3272
+    jump while828
+while_end830:
+    %t3273 = ref program
+    %t3274 = load callee
+    %t3275 = call functionIndex(%t3273, %t3274)
+    local i64 fi
+    store fi, %t3275
+    %t3276 = const string ""
+    local string returnType
+    store returnType, %t3276
+    %t3277 = load callee
+    %t3278 = const string "print"
+    %t3279 = eq %t3277, %t3278
+    %t3280 = load callee
+    %t3281 = const string "writeFile"
+    %t3282 = eq %t3280, %t3281
+    %t3283 = or %t3279, %t3282
+    %t3284 = load callee
+    %t3285 = const string "push"
+    %t3286 = eq %t3284, %t3285
+    %t3287 = or %t3283, %t3286
+    branch %t3287 ? then837 : else838
+then837:
+    %t3288 = const string "void"
+    store returnType, %t3288
+    jump endif839
+else838:
+    %t3289 = load fi
+    %t3290 = const i64 0
+    %t3291 = ge %t3289, %t3290
+    branch %t3291 ? then840 : else841
+then840:
+    %t3292 = load program
+    %t3293 = field %t3292.functions
+    %t3294 = load fi
+    %t3295 = index %t3293[%t3294]
+    %t3296 = field %t3295.returnType
+    store returnType, %t3296
+    jump endif842
+else841:
+    jump endif842
+endif842:
+    jump endif839
+endif839:
+    %t3297 = load returnType
+    %t3298 = const string "void"
+    %t3299 = eq %t3297, %t3298
+    branch %t3299 ? then843 : else844
+then843:
+    %t3300 = ref state
+    %t3301 = const string "    call "
+    %t3302 = load callee
+    %t3303 = add %t3301, %t3302
+    %t3304 = const string "("
+    %t3305 = add %t3303, %t3304
+    %t3306 = load args
+    %t3307 = add %t3305, %t3306
+    %t3308 = const string ")"
+    %t3309 = add %t3307, %t3308
+    call emitLine(%t3300, %t3309)
+    %t3310 = const string ""
+    return %t3310
+    jump endif845
+else844:
+    jump endif845
+endif845:
+    %t3311 = ref state
+    %t3312 = call newTemp(%t3311)
+    local string t
+    store t, %t3312
+    %t3313 = ref state
+    %t3314 = const string "    "
+    %t3315 = load t
+    %t3316 = add %t3314, %t3315
+    %t3317 = const string " = call "
+    %t3318 = add %t3316, %t3317
+    %t3319 = load callee
+    %t3320 = add %t3318, %t3319
+    %t3321 = const string "("
+    %t3322 = add %t3320, %t3321
+    %t3323 = load args
+    %t3324 = add %t3322, %t3323
+    %t3325 = const string ")"
+    %t3326 = add %t3324, %t3325
+    call emitLine(%t3313, %t3326)
+    %t3327 = load t
+    return %t3327
+    jump endif827
+else826:
+    jump endif827
+endif827:
+    %t3328 = load x
+    %t3329 = field %t3328.kind
+    %t3330 = const i64 9
+    %t3331 = eq %t3329, %t3330
+    branch %t3331 ? then846 : else847
+then846:
+    %t3332 = ref state
+    %t3333 = ref program
+    %t3334 = load x
+    %t3335 = field %t3334.left
+    %t3336 = call emitExpr(%t3332, %t3333, %t3335)
+    local string base
+    store base, %t3336
+    %t3337 = ref state
+    %t3338 = call newTemp(%t3337)
+    local string t
+    store t, %t3338
+    %t3339 = ref state
+    %t3340 = const string "    "
+    %t3341 = load t
+    %t3342 = add %t3340, %t3341
+    %t3343 = const string " = field "
+    %t3344 = add %t3342, %t3343
+    %t3345 = load base
+    %t3346 = add %t3344, %t3345
+    %t3347 = const string "."
+    %t3348 = add %t3346, %t3347
+    %t3349 = load x
+    %t3350 = field %t3349.text
+    %t3351 = add %t3348, %t3350
+    call emitLine(%t3339, %t3351)
+    %t3352 = load t
+    return %t3352
+    jump endif848
+else847:
+    jump endif848
+endif848:
+    %t3353 = load x
+    %t3354 = field %t3353.kind
+    %t3355 = const i64 10
+    %t3356 = eq %t3354, %t3355
+    branch %t3356 ? then849 : else850
+then849:
+    %t3357 = ref state
+    %t3358 = ref program
+    %t3359 = load x
+    %t3360 = field %t3359.left
+    %t3361 = call emitExpr(%t3357, %t3358, %t3360)
+    local string base
+    store base, %t3361
+    %t3362 = ref state
+    %t3363 = ref program
+    %t3364 = load x
+    %t3365 = field %t3364.right
+    %t3366 = call emitExpr(%t3362, %t3363, %t3365)
+    local string idx
+    store idx, %t3366
+    %t3367 = ref state
+    %t3368 = call newTemp(%t3367)
+    local string t
+    store t, %t3368
+    %t3369 = ref state
+    %t3370 = const string "    "
+    %t3371 = load t
+    %t3372 = add %t3370, %t3371
+    %t3373 = const string " = index "
+    %t3374 = add %t3372, %t3373
+    %t3375 = load base
+    %t3376 = add %t3374, %t3375
+    %t3377 = const string "["
+    %t3378 = add %t3376, %t3377
+    %t3379 = load idx
+    %t3380 = add %t3378, %t3379
+    %t3381 = const string "]"
+    %t3382 = add %t3380, %t3381
+    call emitLine(%t3369, %t3382)
+    %t3383 = load t
+    return %t3383
+    jump endif851
+else850:
+    jump endif851
+endif851:
+    %t3384 = load x
+    %t3385 = field %t3384.kind
+    %t3386 = const i64 11
+    %t3387 = eq %t3385, %t3386
+    branch %t3387 ? then852 : else853
+then852:
+    %t3388 = ref state
+    %t3389 = call newTemp(%t3388)
+    local string t
+    store t, %t3389
+    %t3390 = ref state
+    %t3391 = const string "    "
+    %t3392 = load t
+    %t3393 = add %t3391, %t3392
+    %t3394 = const string " = new "
+    %t3395 = add %t3393, %t3394
+    %t3396 = load x
+    %t3397 = field %t3396.text
+    %t3398 = add %t3395, %t3397
+    call emitLine(%t3390, %t3398)
+    %t3399 = load t
+    return %t3399
+    jump endif854
+else853:
+    jump endif854
+endif854:
+    %t3400 = load x
+    %t3401 = field %t3400.kind
+    %t3402 = const i64 12
+    %t3403 = eq %t3401, %t3402
+    branch %t3403 ? then855 : else856
+then855:
+    %t3404 = const string ""
+    local string args
+    store args, %t3404
+    %t3405 = const i64 0
+    local i64 i
+    store i, %t3405
+    jump while858
+while858:
+    %t3406 = load i
+    %t3407 = load x
+    %t3408 = field %t3407.args
+    %t3409 = call listLength(%t3408)
+    %t3410 = lt %t3406, %t3409
+    branch %t3410 ? while_body859 : while_end860
+while_body859:
+    %t3411 = load i
+    %t3412 = const i64 0
+    %t3413 = gt %t3411, %t3412
+    branch %t3413 ? then861 : else862
+then861:
+    %t3414 = load args
+    %t3415 = const string ", "
+    %t3416 = add %t3414, %t3415
+    store args, %t3416
+    jump endif863
+else862:
+    jump endif863
+endif863:
+    %t3417 = load args
+    %t3418 = ref state
+    %t3419 = ref program
+    %t3420 = load x
+    %t3421 = field %t3420.args
+    %t3422 = load i
+    %t3423 = index %t3421[%t3422]
+    %t3424 = call emitExpr(%t3418, %t3419, %t3423)
+    %t3425 = add %t3417, %t3424
+    store args, %t3425
+    %t3426 = load i
+    %t3427 = const i64 1
+    %t3428 = add %t3426, %t3427
+    store i, %t3428
+    jump while858
+while_end860:
+    %t3429 = ref state
+    %t3430 = call newTemp(%t3429)
+    local string t
+    store t, %t3430
+    %t3431 = ref state
+    %t3432 = const string "    "
+    %t3433 = load t
+    %t3434 = add %t3432, %t3433
+    %t3435 = const string " = list("
+    %t3436 = add %t3434, %t3435
+    %t3437 = load args
+    %t3438 = add %t3436, %t3437
+    %t3439 = const string ")"
+    %t3440 = add %t3438, %t3439
+    call emitLine(%t3431, %t3440)
+    %t3441 = load t
+    return %t3441
+    jump endif857
+else856:
+    jump endif857
+endif857:
+    %t3442 = const string "%invalid"
+    return %t3442
+endfunction
+function emitStmt(Ref<EmitState> state, Ref<Program> program, i64 id) -> void
+entry:
+    %t3443 = load program
+    %t3444 = field %t3443.stmts
+    %t3445 = load id
+    %t3446 = index %t3444[%t3445]
+    local Stmt s
+    store s, %t3446
+    %t3447 = load s
+    %t3448 = field %t3447.kind
+    %t3449 = const i64 1
+    %t3450 = eq %t3448, %t3449
+    branch %t3450 ? then864 : else865
+then864:
+    %t3451 = ref state
+    %t3452 = ref program
+    %t3453 = load s
+    %t3454 = field %t3453.expr
+    %t3455 = call emitExpr(%t3451, %t3452, %t3454)
+    local string v
+    store v, %t3455
+    %t3456 = ref state
+    %t3457 = const string "    local "
+    %t3458 = load s
+    %t3459 = field %t3458.type
+    %t3460 = add %t3457, %t3459
+    %t3461 = const string " "
+    %t3462 = add %t3460, %t3461
+    %t3463 = load s
+    %t3464 = field %t3463.name
+    %t3465 = add %t3462, %t3464
+    call emitLine(%t3456, %t3465)
+    %t3466 = ref state
+    %t3467 = const string "    store "
+    %t3468 = load s
+    %t3469 = field %t3468.name
+    %t3470 = add %t3467, %t3469
+    %t3471 = const string ", "
+    %t3472 = add %t3470, %t3471
+    %t3473 = load v
+    %t3474 = add %t3472, %t3473
+    call emitLine(%t3466, %t3474)
+    return
+    jump endif866
+else865:
+    jump endif866
+endif866:
+    %t3475 = load s
+    %t3476 = field %t3475.kind
+    %t3477 = const i64 2
+    %t3478 = eq %t3476, %t3477
+    branch %t3478 ? then867 : else868
+then867:
+    %t3479 = load s
+    %t3480 = field %t3479.expr
+    %t3481 = const i64 0
+    %t3482 = lt %t3480, %t3481
+    branch %t3482 ? then870 : else871
+then870:
+    %t3483 = ref state
+    %t3484 = const string "    return"
+    call emitLine(%t3483, %t3484)
+    jump endif872
+else871:
+    %t3485 = ref state
+    %t3486 = const string "    return "
+    %t3487 = ref state
+    %t3488 = ref program
+    %t3489 = load s
+    %t3490 = field %t3489.expr
+    %t3491 = call emitExpr(%t3487, %t3488, %t3490)
+    %t3492 = add %t3486, %t3491
+    call emitLine(%t3485, %t3492)
+    jump endif872
+endif872:
+    return
+    jump endif869
+else868:
+    jump endif869
+endif869:
+    %t3493 = load s
+    %t3494 = field %t3493.kind
+    %t3495 = const i64 3
+    %t3496 = eq %t3494, %t3495
+    branch %t3496 ? then873 : else874
+then873:
+    %t3497 = ref state
+    %t3498 = ref program
+    %t3499 = load s
+    %t3500 = field %t3499.expr
+    %t3501 = call emitExpr(%t3497, %t3498, %t3500)
+    return
+    jump endif875
+else874:
+    jump endif875
+endif875:
+    %t3502 = load s
+    %t3503 = field %t3502.kind
+    %t3504 = const i64 4
+    %t3505 = eq %t3503, %t3504
+    branch %t3505 ? then876 : else877
+then876:
+    %t3506 = ref state
+    %t3507 = ref program
+    %t3508 = load s
+    %t3509 = field %t3508.right
+    %t3510 = call emitExpr(%t3506, %t3507, %t3509)
+    local string value
+    store value, %t3510
+    %t3511 = load program
+    %t3512 = field %t3511.exprs
+    %t3513 = load s
+    %t3514 = field %t3513.left
+    %t3515 = index %t3512[%t3514]
+    local Expr target
+    store target, %t3515
+    %t3516 = load target
+    %t3517 = field %t3516.kind
+    %t3518 = const i64 5
+    %t3519 = eq %t3517, %t3518
+    branch %t3519 ? then879 : else880
+then879:
+    %t3520 = ref state
+    %t3521 = const string "    store "
+    %t3522 = load target
+    %t3523 = field %t3522.text
+    %t3524 = add %t3521, %t3523
+    %t3525 = const string ", "
+    %t3526 = add %t3524, %t3525
+    %t3527 = load value
+    %t3528 = add %t3526, %t3527
+    call emitLine(%t3520, %t3528)
+    jump endif881
+else880:
+    %t3529 = load target
+    %t3530 = field %t3529.kind
+    %t3531 = const i64 9
+    %t3532 = eq %t3530, %t3531
+    branch %t3532 ? then882 : else883
+then882:
+    %t3533 = load program
+    %t3534 = field %t3533.exprs
+    %t3535 = load target
+    %t3536 = field %t3535.left
+    %t3537 = index %t3534[%t3536]
+    local Expr base
+    store base, %t3537
+    %t3538 = ref state
+    %t3539 = const string "    field_set "
+    %t3540 = load base
+    %t3541 = field %t3540.text
+    %t3542 = add %t3539, %t3541
+    %t3543 = const string "."
+    %t3544 = add %t3542, %t3543
+    %t3545 = load target
+    %t3546 = field %t3545.text
+    %t3547 = add %t3544, %t3546
+    %t3548 = const string " = "
+    %t3549 = add %t3547, %t3548
+    %t3550 = load value
+    %t3551 = add %t3549, %t3550
+    call emitLine(%t3538, %t3551)
+    jump endif884
+else883:
+    %t3552 = load target
+    %t3553 = field %t3552.kind
+    %t3554 = const i64 10
+    %t3555 = eq %t3553, %t3554
+    branch %t3555 ? then885 : else886
+then885:
+    %t3556 = load program
+    %t3557 = field %t3556.exprs
+    %t3558 = load target
+    %t3559 = field %t3558.left
+    %t3560 = index %t3557[%t3559]
+    local Expr base
+    store base, %t3560
+    %t3561 = ref state
+    %t3562 = ref program
+    %t3563 = load target
+    %t3564 = field %t3563.right
+    %t3565 = call emitExpr(%t3561, %t3562, %t3564)
+    local string idx
+    store idx, %t3565
+    %t3566 = ref state
+    %t3567 = const string "    index_set "
+    %t3568 = load base
+    %t3569 = field %t3568.text
+    %t3570 = add %t3567, %t3569
+    %t3571 = const string "["
+    %t3572 = add %t3570, %t3571
+    %t3573 = load idx
+    %t3574 = add %t3572, %t3573
+    %t3575 = const string "] = "
+    %t3576 = add %t3574, %t3575
+    %t3577 = load value
+    %t3578 = add %t3576, %t3577
+    call emitLine(%t3566, %t3578)
+    jump endif887
+else886:
+    jump endif887
+endif887:
+    jump endif884
+endif884:
+    jump endif881
+endif881:
+    return
+    jump endif878
+else877:
+    jump endif878
+endif878:
+    %t3579 = load s
+    %t3580 = field %t3579.kind
+    %t3581 = const i64 5
+    %t3582 = eq %t3580, %t3581
+    branch %t3582 ? then888 : else889
+then888:
+    %t3583 = ref state
+    %t3584 = ref program
+    %t3585 = load s
+    %t3586 = field %t3585.expr
+    %t3587 = call emitExpr(%t3583, %t3584, %t3586)
+    local string cond
+    store cond, %t3587
+    %t3588 = ref state
+    %t3589 = const string "then"
+    %t3590 = call newLabel(%t3588, %t3589)
+    local string thenLabel
+    store thenLabel, %t3590
+    %t3591 = ref state
+    %t3592 = const string "else"
+    %t3593 = call newLabel(%t3591, %t3592)
+    local string elseLabel
+    store elseLabel, %t3593
+    %t3594 = ref state
+    %t3595 = const string "endif"
+    %t3596 = call newLabel(%t3594, %t3595)
+    local string endLabel
+    store endLabel, %t3596
+    %t3597 = ref state
+    %t3598 = const string "    branch "
+    %t3599 = load cond
+    %t3600 = add %t3598, %t3599
+    %t3601 = const string " ? "
+    %t3602 = add %t3600, %t3601
+    %t3603 = load thenLabel
+    %t3604 = add %t3602, %t3603
+    %t3605 = const string " : "
+    %t3606 = add %t3604, %t3605
+    %t3607 = load elseLabel
+    %t3608 = add %t3606, %t3607
+    call emitLine(%t3597, %t3608)
+    %t3609 = ref state
+    %t3610 = load thenLabel
+    %t3611 = const string ":"
+    %t3612 = add %t3610, %t3611
+    call emitLine(%t3609, %t3612)
+    %t3613 = const i64 0
+    local i64 i
+    store i, %t3613
+    jump while891
+while891:
+    %t3614 = load i
+    %t3615 = load s
+    %t3616 = field %t3615.thenStmts
+    %t3617 = call listLength(%t3616)
+    %t3618 = lt %t3614, %t3617
+    branch %t3618 ? while_body892 : while_end893
+while_body892:
+    %t3619 = ref state
+    %t3620 = ref program
+    %t3621 = load s
+    %t3622 = field %t3621.thenStmts
+    %t3623 = load i
+    %t3624 = index %t3622[%t3623]
+    call emitStmt(%t3619, %t3620, %t3624)
+    %t3625 = load i
+    %t3626 = const i64 1
+    %t3627 = add %t3625, %t3626
+    store i, %t3627
+    jump while891
+while_end893:
+    %t3628 = ref state
+    %t3629 = const string "    jump "
+    %t3630 = load endLabel
+    %t3631 = add %t3629, %t3630
+    call emitLine(%t3628, %t3631)
+    %t3632 = ref state
+    %t3633 = load elseLabel
+    %t3634 = const string ":"
+    %t3635 = add %t3633, %t3634
+    call emitLine(%t3632, %t3635)
+    %t3636 = const i64 0
+    store i, %t3636
+    jump while894
+while894:
+    %t3637 = load i
+    %t3638 = load s
+    %t3639 = field %t3638.elseStmts
+    %t3640 = call listLength(%t3639)
+    %t3641 = lt %t3637, %t3640
+    branch %t3641 ? while_body895 : while_end896
+while_body895:
+    %t3642 = ref state
+    %t3643 = ref program
+    %t3644 = load s
+    %t3645 = field %t3644.elseStmts
+    %t3646 = load i
+    %t3647 = index %t3645[%t3646]
+    call emitStmt(%t3642, %t3643, %t3647)
+    %t3648 = load i
+    %t3649 = const i64 1
+    %t3650 = add %t3648, %t3649
+    store i, %t3650
+    jump while894
+while_end896:
+    %t3651 = ref state
+    %t3652 = const string "    jump "
+    %t3653 = load endLabel
+    %t3654 = add %t3652, %t3653
+    call emitLine(%t3651, %t3654)
+    %t3655 = ref state
+    %t3656 = load endLabel
+    %t3657 = const string ":"
+    %t3658 = add %t3656, %t3657
+    call emitLine(%t3655, %t3658)
+    return
+    jump endif890
+else889:
+    jump endif890
+endif890:
+    %t3659 = load s
+    %t3660 = field %t3659.kind
+    %t3661 = const i64 6
+    %t3662 = eq %t3660, %t3661
+    branch %t3662 ? then897 : else898
+then897:
+    %t3663 = ref state
+    %t3664 = const string "while"
+    %t3665 = call newLabel(%t3663, %t3664)
+    local string head
+    store head, %t3665
+    %t3666 = ref state
+    %t3667 = const string "while_body"
+    %t3668 = call newLabel(%t3666, %t3667)
+    local string body
+    store body, %t3668
+    %t3669 = ref state
+    %t3670 = const string "while_end"
+    %t3671 = call newLabel(%t3669, %t3670)
+    local string end
+    store end, %t3671
+    %t3672 = ref state
+    %t3673 = const string "    jump "
+    %t3674 = load head
+    %t3675 = add %t3673, %t3674
+    call emitLine(%t3672, %t3675)
+    %t3676 = ref state
+    %t3677 = load head
+    %t3678 = const string ":"
+    %t3679 = add %t3677, %t3678
+    call emitLine(%t3676, %t3679)
+    %t3680 = ref state
+    %t3681 = ref program
+    %t3682 = load s
+    %t3683 = field %t3682.expr
+    %t3684 = call emitExpr(%t3680, %t3681, %t3683)
+    local string cond
+    store cond, %t3684
+    %t3685 = ref state
+    %t3686 = const string "    branch "
+    %t3687 = load cond
+    %t3688 = add %t3686, %t3687
+    %t3689 = const string " ? "
+    %t3690 = add %t3688, %t3689
+    %t3691 = load body
+    %t3692 = add %t3690, %t3691
+    %t3693 = const string " : "
+    %t3694 = add %t3692, %t3693
+    %t3695 = load end
+    %t3696 = add %t3694, %t3695
+    call emitLine(%t3685, %t3696)
+    %t3697 = ref state
+    %t3698 = load body
+    %t3699 = const string ":"
+    %t3700 = add %t3698, %t3699
+    call emitLine(%t3697, %t3700)
+    %t3701 = const i64 0
+    local i64 i
+    store i, %t3701
+    jump while900
+while900:
+    %t3702 = load i
+    %t3703 = load s
+    %t3704 = field %t3703.body
+    %t3705 = call listLength(%t3704)
+    %t3706 = lt %t3702, %t3705
+    branch %t3706 ? while_body901 : while_end902
+while_body901:
+    %t3707 = ref state
+    %t3708 = ref program
+    %t3709 = load s
+    %t3710 = field %t3709.body
+    %t3711 = load i
+    %t3712 = index %t3710[%t3711]
+    call emitStmt(%t3707, %t3708, %t3712)
+    %t3713 = load i
+    %t3714 = const i64 1
+    %t3715 = add %t3713, %t3714
+    store i, %t3715
+    jump while900
+while_end902:
+    %t3716 = ref state
+    %t3717 = const string "    jump "
+    %t3718 = load head
+    %t3719 = add %t3717, %t3718
+    call emitLine(%t3716, %t3719)
+    %t3720 = ref state
+    %t3721 = load end
+    %t3722 = const string ":"
+    %t3723 = add %t3721, %t3722
+    call emitLine(%t3720, %t3723)
+    return
+    jump endif899
+else898:
+    jump endif899
+endif899:
+endfunction
+function emitProgram(Ref<Program> program) -> string
+entry:
+    %t3724 = new EmitState
+    local EmitState state
+    store state, %t3724
+    %t3725 = list()
+    field_set state.lines = %t3725
+    %t3726 = const i64 0
+    field_set state.temp = %t3726
+    %t3727 = const i64 0
+    field_set state.label = %t3727
+    %t3728 = const string "rir 1"
+    local string header
+    store header, %t3728
+    %t3729 = ref state
+    %t3730 = load header
+    call emitLine(%t3729, %t3730)
+    %t3731 = const i64 0
+    local i64 i
+    store i, %t3731
+    jump while903
+while903:
+    %t3732 = load i
+    %t3733 = load program
+    %t3734 = field %t3733.structs
+    %t3735 = call listLength(%t3734)
+    %t3736 = lt %t3732, %t3735
+    branch %t3736 ? while_body904 : while_end905
+while_body904:
+    %t3737 = load program
+    %t3738 = field %t3737.structs
+    %t3739 = load i
+    %t3740 = index %t3738[%t3739]
+    local StructDef s
+    store s, %t3740
+    %t3741 = ref state
+    %t3742 = const string "struct "
+    %t3743 = load s
+    %t3744 = field %t3743.name
+    %t3745 = add %t3742, %t3744
+    call emitLine(%t3741, %t3745)
+    %t3746 = const i64 0
+    local i64 j
+    store j, %t3746
+    jump while906
+while906:
+    %t3747 = load j
+    %t3748 = load s
+    %t3749 = field %t3748.fields
+    %t3750 = call listLength(%t3749)
+    %t3751 = lt %t3747, %t3750
+    branch %t3751 ? while_body907 : while_end908
+while_body907:
+    %t3752 = ref state
+    %t3753 = const string "  field "
+    %t3754 = load s
+    %t3755 = field %t3754.fields
+    %t3756 = load j
+    %t3757 = index %t3755[%t3756]
+    %t3758 = field %t3757.type
+    %t3759 = add %t3753, %t3758
+    %t3760 = const string " "
+    %t3761 = add %t3759, %t3760
+    %t3762 = load s
+    %t3763 = field %t3762.fields
+    %t3764 = load j
+    %t3765 = index %t3763[%t3764]
+    %t3766 = field %t3765.name
+    %t3767 = add %t3761, %t3766
+    call emitLine(%t3752, %t3767)
+    %t3768 = load j
+    %t3769 = const i64 1
+    %t3770 = add %t3768, %t3769
+    store j, %t3770
+    jump while906
+while_end908:
+    %t3771 = load i
+    %t3772 = const i64 1
+    %t3773 = add %t3771, %t3772
+    store i, %t3773
+    jump while903
+while_end905:
+    %t3774 = const i64 0
+    store i, %t3774
+    jump while909
+while909:
+    %t3775 = load i
+    %t3776 = load program
+    %t3777 = field %t3776.functions
+    %t3778 = call listLength(%t3777)
+    %t3779 = lt %t3775, %t3778
+    branch %t3779 ? while_body910 : while_end911
+while_body910:
+    %t3780 = load program
+    %t3781 = field %t3780.functions
+    %t3782 = load i
+    %t3783 = index %t3781[%t3782]
+    local FunctionDef f
+    store f, %t3783
+    %t3784 = const string "function "
+    %t3785 = load f
+    %t3786 = field %t3785.name
+    %t3787 = add %t3784, %t3786
+    %t3788 = const string "("
+    %t3789 = add %t3787, %t3788
+    local string sig
+    store sig, %t3789
+    %t3790 = const i64 0
+    local i64 j
+    store j, %t3790
+    jump while912
+while912:
+    %t3791 = load j
+    %t3792 = load f
+    %t3793 = field %t3792.params
+    %t3794 = call listLength(%t3793)
+    %t3795 = lt %t3791, %t3794
+    branch %t3795 ? while_body913 : while_end914
+while_body913:
+    %t3796 = load j
+    %t3797 = const i64 0
+    %t3798 = gt %t3796, %t3797
+    branch %t3798 ? then915 : else916
+then915:
+    %t3799 = load sig
+    %t3800 = const string ", "
+    %t3801 = add %t3799, %t3800
+    store sig, %t3801
+    jump endif917
+else916:
+    jump endif917
+endif917:
+    %t3802 = load sig
+    %t3803 = load f
+    %t3804 = field %t3803.params
+    %t3805 = load j
+    %t3806 = index %t3804[%t3805]
+    %t3807 = field %t3806.type
+    %t3808 = add %t3802, %t3807
+    %t3809 = const string " "
+    %t3810 = add %t3808, %t3809
+    %t3811 = load f
+    %t3812 = field %t3811.params
+    %t3813 = load j
+    %t3814 = index %t3812[%t3813]
+    %t3815 = field %t3814.name
+    %t3816 = add %t3810, %t3815
+    store sig, %t3816
+    %t3817 = load j
+    %t3818 = const i64 1
+    %t3819 = add %t3817, %t3818
+    store j, %t3819
+    jump while912
+while_end914:
+    %t3820 = load sig
+    %t3821 = const string ") -> "
+    %t3822 = add %t3820, %t3821
+    %t3823 = load f
+    %t3824 = field %t3823.returnType
+    %t3825 = add %t3822, %t3824
+    store sig, %t3825
+    %t3826 = ref state
+    %t3827 = load sig
+    call emitLine(%t3826, %t3827)
+    %t3828 = ref state
+    %t3829 = const string "entry:"
+    call emitLine(%t3828, %t3829)
+    %t3830 = const i64 0
+    store j, %t3830
+    jump while918
+while918:
+    %t3831 = load j
+    %t3832 = load f
+    %t3833 = field %t3832.body
+    %t3834 = call listLength(%t3833)
+    %t3835 = lt %t3831, %t3834
+    branch %t3835 ? while_body919 : while_end920
+while_body919:
+    %t3836 = ref state
+    %t3837 = ref program
+    %t3838 = load f
+    %t3839 = field %t3838.body
+    %t3840 = load j
+    %t3841 = index %t3839[%t3840]
+    call emitStmt(%t3836, %t3837, %t3841)
+    %t3842 = load j
+    %t3843 = const i64 1
+    %t3844 = add %t3842, %t3843
+    store j, %t3844
+    jump while918
+while_end920:
+    %t3845 = ref state
+    %t3846 = const string "endfunction"
+    call emitLine(%t3845, %t3846)
+    %t3847 = load i
+    %t3848 = const i64 1
+    %t3849 = add %t3847, %t3848
+    store i, %t3849
+    jump while909
+while_end911:
+    %t3850 = const string ""
+    local string out
+    store out, %t3850
+    %t3851 = const i64 0
+    store i, %t3851
+    jump while921
+while921:
+    %t3852 = load i
+    %t3853 = load state
+    %t3854 = field %t3853.lines
+    %t3855 = call listLength(%t3854)
+    %t3856 = lt %t3852, %t3855
+    branch %t3856 ? while_body922 : while_end923
+while_body922:
+    %t3857 = load out
+    %t3858 = load state
+    %t3859 = field %t3858.lines
+    %t3860 = load i
+    %t3861 = index %t3859[%t3860]
+    %t3862 = add %t3857, %t3861
+    %t3863 = const string "\n"
+    %t3864 = add %t3862, %t3863
+    store out, %t3864
+    %t3865 = load i
+    %t3866 = const i64 1
+    %t3867 = add %t3865, %t3866
+    store i, %t3867
+    jump while921
+while_end923:
+    %t3868 = load out
+    return %t3868
+endfunction
+function compileSource(string source) -> string
+entry:
+    %t3869 = load source
+    %t3870 = call parseProgram(%t3869)
+    local Program program
+    store program, %t3870
+    %t3871 = ref program
+    %t3872 = call analyzeProgram(%t3871)
+    %t3873 = const i64 0
+    %t3874 = ne %t3872, %t3873
+    branch %t3874 ? then924 : else925
+then924:
+    %t3875 = const string ""
+    return %t3875
+    jump endif926
+else925:
+    jump endif926
+endif926:
+    %t3876 = ref program
+    %t3877 = call emitProgram(%t3876)
+    return %t3877
+endfunction
+function main() -> i64
+entry:
+    %t3878 = const string "stage1/input.raz"
+    %t3879 = call readFile(%t3878)
+    local string source
+    store source, %t3879
+    %t3880 = load source
+    %t3881 = call compileSource(%t3880)
+    local string rir
+    store rir, %t3881
+    %t3882 = load rir
+    %t3883 = const string ""
+    %t3884 = eq %t3882, %t3883
+    branch %t3884 ? then927 : else928
+then927:
+    %t3885 = const i64 1
+    return %t3885
+    jump endif929
+else928:
+    jump endif929
+endif929:
+    %t3886 = const string "stage1/output.rir"
+    %t3887 = load rir
+    call writeFile(%t3886, %t3887)
+    %t3888 = const i64 0
+    return %t3888
+endfunction

@@ -1,0 +1,1245 @@
+struct Token
+  field i64 kind
+  field string text
+struct Expr
+  field i64 kind
+  field i64 left
+  field i64 right
+  field i64 value
+  field string text
+struct ParseState
+  field List<Token> tokens
+  field i64 pos
+  field List<Expr> nodes
+  field i64 nextId
+  field i64 last
+function isSpace(c:i64) -> bool
+b1:
+  %v1_load = load c : i64
+  %v2_const = const i64 32
+  %v3_bin = eq %v1_load, %v2_const : bool
+  local bool __logic_4
+  branch %v3_bin ? b3 : b2
+b2:
+  %v5_load = load c : i64
+  %v6_const = const i64 9
+  %v7_bin = eq %v5_load, %v6_const : bool
+  store __logic_4, %v7_bin
+  jump b4
+b3:
+  %v8_logic = const bool true
+  store __logic_4, %v8_logic
+  jump b4
+b4:
+  %v9_logic = load __logic_4 : bool
+  local bool __logic_10
+  branch %v9_logic ? b6 : b5
+b5:
+  %v11_load = load c : i64
+  %v12_const = const i64 10
+  %v13_bin = eq %v11_load, %v12_const : bool
+  store __logic_10, %v13_bin
+  jump b7
+b6:
+  %v14_logic = const bool true
+  store __logic_10, %v14_logic
+  jump b7
+b7:
+  %v15_logic = load __logic_10 : bool
+  local bool __logic_16
+  branch %v15_logic ? b9 : b8
+b8:
+  %v17_load = load c : i64
+  %v18_const = const i64 13
+  %v19_bin = eq %v17_load, %v18_const : bool
+  store __logic_16, %v19_bin
+  jump b10
+b9:
+  %v20_logic = const bool true
+  store __logic_16, %v20_logic
+  jump b10
+b10:
+  %v21_logic = load __logic_16 : bool
+  return %v21_logic
+function isDigit(c:i64) -> bool
+b11:
+  %v22_load = load c : i64
+  %v23_const = const i64 48
+  %v24_bin = ge %v22_load, %v23_const : bool
+  local bool __logic_25
+  branch %v24_bin ? b12 : b13
+b12:
+  %v26_load = load c : i64
+  %v27_const = const i64 57
+  %v28_bin = le %v26_load, %v27_const : bool
+  store __logic_25, %v28_bin
+  jump b14
+b13:
+  %v29_logic = const bool false
+  store __logic_25, %v29_logic
+  jump b14
+b14:
+  %v30_logic = load __logic_25 : bool
+  return %v30_logic
+function isAlpha(c:i64) -> bool
+b15:
+  %v31_load = load c : i64
+  %v32_const = const i64 65
+  %v33_bin = ge %v31_load, %v32_const : bool
+  local bool __logic_34
+  branch %v33_bin ? b16 : b17
+b16:
+  %v35_load = load c : i64
+  %v36_const = const i64 90
+  %v37_bin = le %v35_load, %v36_const : bool
+  store __logic_34, %v37_bin
+  jump b18
+b17:
+  %v38_logic = const bool false
+  store __logic_34, %v38_logic
+  jump b18
+b18:
+  %v39_logic = load __logic_34 : bool
+  local bool __logic_40
+  branch %v39_logic ? b20 : b19
+b19:
+  %v41_load = load c : i64
+  %v42_const = const i64 97
+  %v43_bin = ge %v41_load, %v42_const : bool
+  local bool __logic_44
+  branch %v43_bin ? b22 : b23
+b20:
+  %v50_logic = const bool true
+  store __logic_40, %v50_logic
+  jump b21
+b21:
+  %v51_logic = load __logic_40 : bool
+  local bool __logic_52
+  branch %v51_logic ? b26 : b25
+b22:
+  %v45_load = load c : i64
+  %v46_const = const i64 122
+  %v47_bin = le %v45_load, %v46_const : bool
+  store __logic_44, %v47_bin
+  jump b24
+b23:
+  %v48_logic = const bool false
+  store __logic_44, %v48_logic
+  jump b24
+b24:
+  %v49_logic = load __logic_44 : bool
+  store __logic_40, %v49_logic
+  jump b21
+b25:
+  %v53_load = load c : i64
+  %v54_const = const i64 95
+  %v55_bin = eq %v53_load, %v54_const : bool
+  store __logic_52, %v55_bin
+  jump b27
+b26:
+  %v56_logic = const bool true
+  store __logic_52, %v56_logic
+  jump b27
+b27:
+  %v57_logic = load __logic_52 : bool
+  return %v57_logic
+function lex(source:string) -> List<Token>
+b28:
+  %v58_list = list<List<Token>>()
+  local List<Token> out
+  store out, %v58_list
+  %v59_const = const i64 0
+  local i64 i
+  store i, %v59_const
+  jump b29
+b29:
+  %v60_load = load i : i64
+  %v61_load = load source : string
+  %v62_call = builtin string_length(%v61_load) : i64
+  %v63_bin = lt %v60_load, %v62_call : bool
+  branch %v63_bin ? b30 : b31
+b30:
+  %v64_load = load source : string
+  %v65_load = load i : i64
+  %v66_index = index %v64_load[%v65_load] : i64
+  local i64 c
+  store c, %v66_index
+  %v67_load = load c : i64
+  %v68_call = call isSpace(%v67_load) : bool
+  branch %v68_call ? b32 : b33
+b31:
+  %v198_new = new Token()
+  local Token eof
+  store eof, %v198_new
+  %v199_const = const i64 0
+  field_set eof.kind = %v199_const
+  %v200_const = const string ""
+  field_set eof.text = %v200_const
+  %v201_load = load out : List<Token>
+  %v202_load = load eof : Token
+  %v203_call = builtin list_append(%v201_load, %v202_load) : List<Token>
+  store out, %v203_call
+  %v204_load = load out : List<Token>
+  return %v204_load
+b32:
+  %v69_load = load i : i64
+  %v70_const = const i64 1
+  %v71_bin = add %v69_load, %v70_const : i64
+  store i, %v71_bin
+  jump b34
+b33:
+  %v72_load = load c : i64
+  %v73_call = call isDigit(%v72_load) : bool
+  branch %v73_call ? b35 : b36
+b34:
+  jump b29
+b35:
+  %v74_load = load i : i64
+  local i64 start
+  store start, %v74_load
+  jump b38
+b36:
+  %v98_load = load c : i64
+  %v99_call = call isAlpha(%v98_load) : bool
+  branch %v99_call ? b44 : b45
+b37:
+  jump b34
+b38:
+  %v75_load = load i : i64
+  %v76_load = load source : string
+  %v77_call = builtin string_length(%v76_load) : i64
+  %v78_bin = lt %v75_load, %v77_call : bool
+  local bool __logic_79
+  branch %v78_bin ? b41 : b42
+b39:
+  %v86_load = load i : i64
+  %v87_const = const i64 1
+  %v88_bin = add %v86_load, %v87_const : i64
+  store i, %v88_bin
+  jump b38
+b40:
+  %v89_new = new Token()
+  local Token t
+  store t, %v89_new
+  %v90_const = const i64 2
+  field_set t.kind = %v90_const
+  %v91_load = load source : string
+  %v92_load = load start : i64
+  %v93_load = load i : i64
+  %v94_call = builtin string_slice(%v91_load, %v92_load, %v93_load) : string
+  field_set t.text = %v94_call
+  %v95_load = load out : List<Token>
+  %v96_load = load t : Token
+  %v97_call = builtin list_append(%v95_load, %v96_load) : List<Token>
+  store out, %v97_call
+  jump b37
+b41:
+  %v80_load = load source : string
+  %v81_load = load i : i64
+  %v82_index = index %v80_load[%v81_load] : i64
+  %v83_call = call isDigit(%v82_index) : bool
+  store __logic_79, %v83_call
+  jump b43
+b42:
+  %v84_logic = const bool false
+  store __logic_79, %v84_logic
+  jump b43
+b43:
+  %v85_logic = load __logic_79 : bool
+  branch %v85_logic ? b39 : b40
+b44:
+  %v100_load = load i : i64
+  local i64 start
+  store start, %v100_load
+  jump b47
+b45:
+  %v144_new = new Token()
+  local Token t
+  store t, %v144_new
+  %v145_load = load source : string
+  %v146_load = load i : i64
+  %v147_load = load i : i64
+  %v148_const = const i64 1
+  %v149_bin = add %v147_load, %v148_const : i64
+  %v150_call = builtin string_slice(%v145_load, %v146_load, %v149_bin) : string
+  field_set t.text = %v150_call
+  %v151_load = load c : i64
+  %v152_const = const i64 40
+  %v153_bin = eq %v151_load, %v152_const : bool
+  branch %v153_bin ? b65 : b66
+b46:
+  jump b37
+b47:
+  %v101_load = load i : i64
+  %v102_load = load source : string
+  %v103_call = builtin string_length(%v102_load) : i64
+  %v104_bin = lt %v101_load, %v103_call : bool
+  local bool __logic_105
+  branch %v104_bin ? b50 : b51
+b48:
+  %v119_load = load i : i64
+  %v120_const = const i64 1
+  %v121_bin = add %v119_load, %v120_const : i64
+  store i, %v121_bin
+  jump b47
+b49:
+  %v122_load = load source : string
+  %v123_load = load start : i64
+  %v124_load = load i : i64
+  %v125_call = builtin string_slice(%v122_load, %v123_load, %v124_load) : string
+  local string word
+  store word, %v125_call
+  %v126_new = new Token()
+  local Token t
+  store t, %v126_new
+  %v127_load = load word : string
+  field_set t.text = %v127_load
+  %v128_load = load word : string
+  %v129_const = const string "function"
+  %v130_bin = eq %v128_load, %v129_const : bool
+  branch %v130_bin ? b56 : b57
+b50:
+  %v106_load = load source : string
+  %v107_load = load i : i64
+  %v108_index = index %v106_load[%v107_load] : i64
+  %v109_call = call isAlpha(%v108_index) : bool
+  local bool __logic_110
+  branch %v109_call ? b54 : b53
+b51:
+  %v117_logic = const bool false
+  store __logic_105, %v117_logic
+  jump b52
+b52:
+  %v118_logic = load __logic_105 : bool
+  branch %v118_logic ? b48 : b49
+b53:
+  %v111_load = load source : string
+  %v112_load = load i : i64
+  %v113_index = index %v111_load[%v112_load] : i64
+  %v114_call = call isDigit(%v113_index) : bool
+  store __logic_110, %v114_call
+  jump b55
+b54:
+  %v115_logic = const bool true
+  store __logic_110, %v115_logic
+  jump b55
+b55:
+  %v116_logic = load __logic_110 : bool
+  store __logic_105, %v116_logic
+  jump b52
+b56:
+  %v131_const = const i64 10
+  field_set t.kind = %v131_const
+  jump b58
+b57:
+  %v132_load = load word : string
+  %v133_const = const string "let"
+  %v134_bin = eq %v132_load, %v133_const : bool
+  branch %v134_bin ? b59 : b60
+b58:
+  %v141_load = load out : List<Token>
+  %v142_load = load t : Token
+  %v143_call = builtin list_append(%v141_load, %v142_load) : List<Token>
+  store out, %v143_call
+  jump b46
+b59:
+  %v135_const = const i64 11
+  field_set t.kind = %v135_const
+  jump b61
+b60:
+  %v136_load = load word : string
+  %v137_const = const string "return"
+  %v138_bin = eq %v136_load, %v137_const : bool
+  branch %v138_bin ? b62 : b63
+b61:
+  jump b58
+b62:
+  %v139_const = const i64 12
+  field_set t.kind = %v139_const
+  jump b64
+b63:
+  %v140_const = const i64 1
+  field_set t.kind = %v140_const
+  jump b64
+b64:
+  jump b61
+b65:
+  %v154_const = const i64 20
+  field_set t.kind = %v154_const
+  jump b67
+b66:
+  %v155_load = load c : i64
+  %v156_const = const i64 41
+  %v157_bin = eq %v155_load, %v156_const : bool
+  branch %v157_bin ? b68 : b69
+b67:
+  %v192_load = load out : List<Token>
+  %v193_load = load t : Token
+  %v194_call = builtin list_append(%v192_load, %v193_load) : List<Token>
+  store out, %v194_call
+  %v195_load = load i : i64
+  %v196_const = const i64 1
+  %v197_bin = add %v195_load, %v196_const : i64
+  store i, %v197_bin
+  jump b46
+b68:
+  %v158_const = const i64 21
+  field_set t.kind = %v158_const
+  jump b70
+b69:
+  %v159_load = load c : i64
+  %v160_const = const i64 123
+  %v161_bin = eq %v159_load, %v160_const : bool
+  branch %v161_bin ? b71 : b72
+b70:
+  jump b67
+b71:
+  %v162_const = const i64 22
+  field_set t.kind = %v162_const
+  jump b73
+b72:
+  %v163_load = load c : i64
+  %v164_const = const i64 125
+  %v165_bin = eq %v163_load, %v164_const : bool
+  branch %v165_bin ? b74 : b75
+b73:
+  jump b70
+b74:
+  %v166_const = const i64 23
+  field_set t.kind = %v166_const
+  jump b76
+b75:
+  %v167_load = load c : i64
+  %v168_const = const i64 59
+  %v169_bin = eq %v167_load, %v168_const : bool
+  branch %v169_bin ? b77 : b78
+b76:
+  jump b73
+b77:
+  %v170_const = const i64 24
+  field_set t.kind = %v170_const
+  jump b79
+b78:
+  %v171_load = load c : i64
+  %v172_const = const i64 61
+  %v173_bin = eq %v171_load, %v172_const : bool
+  branch %v173_bin ? b80 : b81
+b79:
+  jump b76
+b80:
+  %v174_const = const i64 25
+  field_set t.kind = %v174_const
+  jump b82
+b81:
+  %v175_load = load c : i64
+  %v176_const = const i64 43
+  %v177_bin = eq %v175_load, %v176_const : bool
+  branch %v177_bin ? b83 : b84
+b82:
+  jump b79
+b83:
+  %v178_const = const i64 30
+  field_set t.kind = %v178_const
+  jump b85
+b84:
+  %v179_load = load c : i64
+  %v180_const = const i64 45
+  %v181_bin = eq %v179_load, %v180_const : bool
+  branch %v181_bin ? b86 : b87
+b85:
+  jump b82
+b86:
+  %v182_const = const i64 31
+  field_set t.kind = %v182_const
+  jump b88
+b87:
+  %v183_load = load c : i64
+  %v184_const = const i64 42
+  %v185_bin = eq %v183_load, %v184_const : bool
+  branch %v185_bin ? b89 : b90
+b88:
+  jump b85
+b89:
+  %v186_const = const i64 32
+  field_set t.kind = %v186_const
+  jump b91
+b90:
+  %v187_load = load c : i64
+  %v188_const = const i64 47
+  %v189_bin = eq %v187_load, %v188_const : bool
+  branch %v189_bin ? b92 : b93
+b91:
+  jump b88
+b92:
+  %v190_const = const i64 33
+  field_set t.kind = %v190_const
+  jump b94
+b93:
+  %v191_const = const i64 99
+  field_set t.kind = %v191_const
+  jump b94
+b94:
+  jump b91
+function precedence(kind:i64) -> i64
+b95:
+  %v205_load = load kind : i64
+  %v206_const = const i64 30
+  %v207_bin = eq %v205_load, %v206_const : bool
+  local bool __logic_208
+  branch %v207_bin ? b97 : b96
+b96:
+  %v209_load = load kind : i64
+  %v210_const = const i64 31
+  %v211_bin = eq %v209_load, %v210_const : bool
+  store __logic_208, %v211_bin
+  jump b98
+b97:
+  %v212_logic = const bool true
+  store __logic_208, %v212_logic
+  jump b98
+b98:
+  %v213_logic = load __logic_208 : bool
+  branch %v213_logic ? b99 : b100
+b99:
+  %v214_const = const i64 10
+  return %v214_const
+b100:
+  %v215_load = load kind : i64
+  %v216_const = const i64 32
+  %v217_bin = eq %v215_load, %v216_const : bool
+  local bool __logic_218
+  branch %v217_bin ? b102 : b101
+b101:
+  %v219_load = load kind : i64
+  %v220_const = const i64 33
+  %v221_bin = eq %v219_load, %v220_const : bool
+  store __logic_218, %v221_bin
+  jump b103
+b102:
+  %v222_logic = const bool true
+  store __logic_218, %v222_logic
+  jump b103
+b103:
+  %v223_logic = load __logic_218 : bool
+  branch %v223_logic ? b104 : b105
+b104:
+  %v224_const = const i64 20
+  return %v224_const
+b105:
+  %v225_const = const i64 1
+  %v226_un = const i64 -1
+  return %v226_un
+function addNode(state:ParseState, e:Expr) -> ParseState
+b106:
+  %v227_load = load e : Expr
+  %v228_field = field %v227_load.value : i64
+  field_set e.value = %v228_field
+  %v229_load = load state : ParseState
+  %v230_field = field %v229_load.nextId : i64
+  local i64 id
+  store id, %v230_field
+  %v231_load = load state : ParseState
+  %v232_field = field %v231_load.nodes : List<Expr>
+  %v233_load = load e : Expr
+  %v234_call = builtin list_append(%v232_field, %v233_load) : List<Expr>
+  field_set state.nodes = %v234_call
+  %v235_load = load state : ParseState
+  %v236_field = field %v235_load.nextId : i64
+  %v237_const = const i64 1
+  %v238_bin = add %v236_field, %v237_const : i64
+  field_set state.nextId = %v238_bin
+  %v239_load = load id : i64
+  field_set state.last = %v239_load
+  %v240_load = load state : ParseState
+  return %v240_load
+function parsePrimary(state:ParseState) -> ParseState
+b107:
+  %v241_load = load state : ParseState
+  %v242_field = field %v241_load.tokens : List<Token>
+  %v243_load = load state : ParseState
+  %v244_field = field %v243_load.pos : i64
+  %v245_index = index %v242_field[%v244_field] : Token
+  local Token t
+  store t, %v245_index
+  %v246_load = load t : Token
+  %v247_field = field %v246_load.kind : i64
+  %v248_const = const i64 2
+  %v249_bin = eq %v247_field, %v248_const : bool
+  branch %v249_bin ? b108 : b109
+b108:
+  %v250_new = new Expr()
+  local Expr e
+  store e, %v250_new
+  %v251_const = const i64 1
+  field_set e.kind = %v251_const
+  %v252_const = const i64 0
+  field_set e.value = %v252_const
+  %v253_const = const i64 0
+  local i64 i
+  store i, %v253_const
+  jump b110
+b109:
+  %v280_load = load t : Token
+  %v281_field = field %v280_load.kind : i64
+  %v282_const = const i64 1
+  %v283_bin = eq %v281_field, %v282_const : bool
+  branch %v283_bin ? b113 : b114
+b110:
+  %v254_load = load i : i64
+  %v255_load = load t : Token
+  %v256_field = field %v255_load.text : string
+  %v257_call = builtin string_length(%v256_field) : i64
+  %v258_bin = lt %v254_load, %v257_call : bool
+  branch %v258_bin ? b111 : b112
+b111:
+  %v259_load = load e : Expr
+  %v260_field = field %v259_load.value : i64
+  %v261_const = const i64 10
+  %v262_bin = mul %v260_field, %v261_const : i64
+  %v263_load = load t : Token
+  %v264_field = field %v263_load.text : string
+  %v265_load = load i : i64
+  %v266_index = index %v264_field[%v265_load] : i64
+  %v267_const = const i64 48
+  %v268_bin = sub %v266_index, %v267_const : i64
+  %v269_bin = add %v262_bin, %v268_bin : i64
+  field_set e.value = %v269_bin
+  %v270_load = load i : i64
+  %v271_const = const i64 1
+  %v272_bin = add %v270_load, %v271_const : i64
+  store i, %v272_bin
+  jump b110
+b112:
+  %v273_load = load state : ParseState
+  %v274_field = field %v273_load.pos : i64
+  %v275_const = const i64 1
+  %v276_bin = add %v274_field, %v275_const : i64
+  field_set state.pos = %v276_bin
+  %v277_load = load state : ParseState
+  %v278_load = load e : Expr
+  %v279_call = call addNode(%v277_load, %v278_load) : ParseState
+  return %v279_call
+b113:
+  %v284_new = new Expr()
+  local Expr e
+  store e, %v284_new
+  %v285_const = const i64 2
+  field_set e.kind = %v285_const
+  %v286_load = load t : Token
+  %v287_field = field %v286_load.text : string
+  field_set e.text = %v287_field
+  %v288_load = load state : ParseState
+  %v289_field = field %v288_load.pos : i64
+  %v290_const = const i64 1
+  %v291_bin = add %v289_field, %v290_const : i64
+  field_set state.pos = %v291_bin
+  %v292_load = load state : ParseState
+  %v293_load = load e : Expr
+  %v294_call = call addNode(%v292_load, %v293_load) : ParseState
+  return %v294_call
+b114:
+  %v295_load = load t : Token
+  %v296_field = field %v295_load.kind : i64
+  %v297_const = const i64 20
+  %v298_bin = eq %v296_field, %v297_const : bool
+  branch %v298_bin ? b115 : b116
+b115:
+  %v299_load = load state : ParseState
+  %v300_field = field %v299_load.pos : i64
+  %v301_const = const i64 1
+  %v302_bin = add %v300_field, %v301_const : i64
+  field_set state.pos = %v302_bin
+  %v303_load = load state : ParseState
+  %v304_const = const i64 0
+  %v305_call = call parseExpression(%v303_load, %v304_const) : ParseState
+  store state, %v305_call
+  %v306_load = load state : ParseState
+  %v307_field = field %v306_load.tokens : List<Token>
+  %v308_load = load state : ParseState
+  %v309_field = field %v308_load.pos : i64
+  %v310_index = index %v307_field[%v309_field] : Token
+  %v311_field = field %v310_index.kind : i64
+  %v312_const = const i64 21
+  %v313_bin = eq %v311_field, %v312_const : bool
+  branch %v313_bin ? b117 : b118
+b116:
+  %v319_load = load state : ParseState
+  return %v319_load
+b117:
+  %v314_load = load state : ParseState
+  %v315_field = field %v314_load.pos : i64
+  %v316_const = const i64 1
+  %v317_bin = add %v315_field, %v316_const : i64
+  field_set state.pos = %v317_bin
+  jump b118
+b118:
+  %v318_load = load state : ParseState
+  return %v318_load
+function parseExpression(state:ParseState, minPrec:i64) -> ParseState
+b119:
+  %v320_load = load state : ParseState
+  %v321_call = call parsePrimary(%v320_load) : ParseState
+  store state, %v321_call
+  %v322_load = load state : ParseState
+  %v323_field = field %v322_load.tokens : List<Token>
+  %v324_load = load state : ParseState
+  %v325_field = field %v324_load.pos : i64
+  %v326_index = index %v323_field[%v325_field] : Token
+  %v327_field = field %v326_index.kind : i64
+  local i64 k
+  store k, %v327_field
+  %v328_load = load k : i64
+  %v329_call = call precedence(%v328_load) : i64
+  local i64 p
+  store p, %v329_call
+  jump b120
+b120:
+  %v330_load = load p : i64
+  %v331_load = load minPrec : i64
+  %v332_bin = ge %v330_load, %v331_load : bool
+  branch %v332_bin ? b121 : b122
+b121:
+  %v333_load = load state : ParseState
+  %v334_field = field %v333_load.tokens : List<Token>
+  %v335_load = load state : ParseState
+  %v336_field = field %v335_load.pos : i64
+  %v337_index = index %v334_field[%v336_field] : Token
+  %v338_field = field %v337_index.text : string
+  local string op
+  store op, %v338_field
+  %v339_load = load state : ParseState
+  %v340_field = field %v339_load.last : i64
+  local i64 left
+  store left, %v340_field
+  %v341_load = load state : ParseState
+  %v342_field = field %v341_load.pos : i64
+  %v343_const = const i64 1
+  %v344_bin = add %v342_field, %v343_const : i64
+  field_set state.pos = %v344_bin
+  %v345_load = load state : ParseState
+  %v346_load = load p : i64
+  %v347_const = const i64 1
+  %v348_bin = add %v346_load, %v347_const : i64
+  %v349_call = call parseExpression(%v345_load, %v348_bin) : ParseState
+  store state, %v349_call
+  %v350_load = load state : ParseState
+  %v351_field = field %v350_load.last : i64
+  local i64 right
+  store right, %v351_field
+  %v352_new = new Expr()
+  local Expr e
+  store e, %v352_new
+  %v353_const = const i64 3
+  field_set e.kind = %v353_const
+  %v354_load = load left : i64
+  field_set e.left = %v354_load
+  %v355_load = load right : i64
+  field_set e.right = %v355_load
+  %v356_load = load op : string
+  field_set e.text = %v356_load
+  %v357_load = load state : ParseState
+  %v358_load = load e : Expr
+  %v359_call = call addNode(%v357_load, %v358_load) : ParseState
+  store state, %v359_call
+  %v360_load = load state : ParseState
+  %v361_field = field %v360_load.tokens : List<Token>
+  %v362_load = load state : ParseState
+  %v363_field = field %v362_load.pos : i64
+  %v364_index = index %v361_field[%v363_field] : Token
+  %v365_field = field %v364_index.kind : i64
+  store k, %v365_field
+  %v366_load = load k : i64
+  %v367_call = call precedence(%v366_load) : i64
+  store p, %v367_call
+  jump b120
+b122:
+  %v368_load = load state : ParseState
+  return %v368_load
+function lowerExpr(nodes:List<Expr>, id:i64) -> string
+b123:
+  %v369_load = load nodes : List<Expr>
+  %v370_load = load id : i64
+  %v371_index = index %v369_load[%v370_load] : Expr
+  local Expr e
+  store e, %v371_index
+  %v372_load = load e : Expr
+  %v373_field = field %v372_load.kind : i64
+  %v374_const = const i64 1
+  %v375_bin = eq %v373_field, %v374_const : bool
+  branch %v375_bin ? b124 : b125
+b124:
+  %v376_const = const string "const "
+  %v377_load = load e : Expr
+  %v378_field = field %v377_load.value : i64
+  %v379_call = builtin int_to_string(%v378_field) : string
+  %v380_bin = string_concat %v376_const, %v379_call : string
+  %v381_const = const string "\n"
+  %v382_bin = string_concat %v380_bin, %v381_const : string
+  return %v382_bin
+b125:
+  %v383_load = load e : Expr
+  %v384_field = field %v383_load.kind : i64
+  %v385_const = const i64 2
+  %v386_bin = eq %v384_field, %v385_const : bool
+  branch %v386_bin ? b126 : b127
+b126:
+  %v387_const = const string "load "
+  %v388_load = load e : Expr
+  %v389_field = field %v388_load.text : string
+  %v390_bin = string_concat %v387_const, %v389_field : string
+  %v391_const = const string "\n"
+  %v392_bin = string_concat %v390_bin, %v391_const : string
+  return %v392_bin
+b127:
+  %v393_load = load nodes : List<Expr>
+  %v394_load = load e : Expr
+  %v395_field = field %v394_load.left : i64
+  %v396_call = call lowerExpr(%v393_load, %v395_field) : string
+  local string out
+  store out, %v396_call
+  %v397_load = load out : string
+  %v398_load = load nodes : List<Expr>
+  %v399_load = load e : Expr
+  %v400_field = field %v399_load.right : i64
+  %v401_call = call lowerExpr(%v398_load, %v400_field) : string
+  %v402_bin = string_concat %v397_load, %v401_call : string
+  store out, %v402_bin
+  %v403_load = load e : Expr
+  %v404_field = field %v403_load.text : string
+  %v405_const = const string "+"
+  %v406_bin = eq %v404_field, %v405_const : bool
+  branch %v406_bin ? b128 : b129
+b128:
+  %v407_load = load out : string
+  %v408_const = const string "add\n"
+  %v409_bin = string_concat %v407_load, %v408_const : string
+  store out, %v409_bin
+  jump b130
+b129:
+  %v410_load = load e : Expr
+  %v411_field = field %v410_load.text : string
+  %v412_const = const string "-"
+  %v413_bin = eq %v411_field, %v412_const : bool
+  branch %v413_bin ? b131 : b132
+b130:
+  %v431_load = load out : string
+  return %v431_load
+b131:
+  %v414_load = load out : string
+  %v415_const = const string "sub\n"
+  %v416_bin = string_concat %v414_load, %v415_const : string
+  store out, %v416_bin
+  jump b133
+b132:
+  %v417_load = load e : Expr
+  %v418_field = field %v417_load.text : string
+  %v419_const = const string "*"
+  %v420_bin = eq %v418_field, %v419_const : bool
+  branch %v420_bin ? b134 : b135
+b133:
+  jump b130
+b134:
+  %v421_load = load out : string
+  %v422_const = const string "mul\n"
+  %v423_bin = string_concat %v421_load, %v422_const : string
+  store out, %v423_bin
+  jump b136
+b135:
+  %v424_load = load e : Expr
+  %v425_field = field %v424_load.text : string
+  %v426_const = const string "/"
+  %v427_bin = eq %v425_field, %v426_const : bool
+  branch %v427_bin ? b137 : b138
+b136:
+  jump b133
+b137:
+  %v428_load = load out : string
+  %v429_const = const string "div\n"
+  %v430_bin = string_concat %v428_load, %v429_const : string
+  store out, %v430_bin
+  jump b138
+b138:
+  jump b136
+function compileSubset(source:string) -> string
+b139:
+  %v432_new = new ParseState()
+  local ParseState state
+  store state, %v432_new
+  %v433_load = load source : string
+  %v434_call = call lex(%v433_load) : List<Token>
+  field_set state.tokens = %v434_call
+  %v435_const = const i64 0
+  field_set state.pos = %v435_const
+  %v436_list = list<List<Expr>>()
+  field_set state.nodes = %v436_list
+  %v437_const = const i64 0
+  field_set state.nextId = %v437_const
+  %v438_const = const i64 0
+  field_set state.last = %v438_const
+  %v439_const = const string "rir 0\n"
+  local string out
+  store out, %v439_const
+  jump b140
+b140:
+  %v440_load = load state : ParseState
+  %v441_field = field %v440_load.tokens : List<Token>
+  %v442_load = load state : ParseState
+  %v443_field = field %v442_load.pos : i64
+  %v444_index = index %v441_field[%v443_field] : Token
+  %v445_field = field %v444_index.kind : i64
+  %v446_const = const i64 0
+  %v447_bin = ne %v445_field, %v446_const : bool
+  branch %v447_bin ? b141 : b142
+b141:
+  %v448_load = load state : ParseState
+  %v449_field = field %v448_load.tokens : List<Token>
+  %v450_load = load state : ParseState
+  %v451_field = field %v450_load.pos : i64
+  %v452_index = index %v449_field[%v451_field] : Token
+  %v453_field = field %v452_index.kind : i64
+  %v454_const = const i64 10
+  %v455_bin = eq %v453_field, %v454_const : bool
+  branch %v455_bin ? b143 : b144
+b142:
+  %v674_load = load out : string
+  return %v674_load
+b143:
+  %v456_load = load state : ParseState
+  %v457_field = field %v456_load.pos : i64
+  %v458_const = const i64 1
+  %v459_bin = add %v457_field, %v458_const : i64
+  field_set state.pos = %v459_bin
+  %v460_load = load state : ParseState
+  %v461_field = field %v460_load.tokens : List<Token>
+  %v462_load = load state : ParseState
+  %v463_field = field %v462_load.pos : i64
+  %v464_index = index %v461_field[%v463_field] : Token
+  %v465_field = field %v464_index.text : string
+  local string name
+  store name, %v465_field
+  %v466_load = load state : ParseState
+  %v467_field = field %v466_load.pos : i64
+  %v468_const = const i64 1
+  %v469_bin = add %v467_field, %v468_const : i64
+  field_set state.pos = %v469_bin
+  jump b146
+b144:
+  %v670_load = load state : ParseState
+  %v671_field = field %v670_load.pos : i64
+  %v672_const = const i64 1
+  %v673_bin = add %v671_field, %v672_const : i64
+  field_set state.pos = %v673_bin
+  jump b145
+b145:
+  jump b140
+b146:
+  %v470_load = load state : ParseState
+  %v471_field = field %v470_load.tokens : List<Token>
+  %v472_load = load state : ParseState
+  %v473_field = field %v472_load.pos : i64
+  %v474_index = index %v471_field[%v473_field] : Token
+  %v475_field = field %v474_index.kind : i64
+  %v476_const = const i64 22
+  %v477_bin = ne %v475_field, %v476_const : bool
+  local bool __logic_478
+  branch %v477_bin ? b149 : b150
+b147:
+  %v489_load = load state : ParseState
+  %v490_field = field %v489_load.pos : i64
+  %v491_const = const i64 1
+  %v492_bin = add %v490_field, %v491_const : i64
+  field_set state.pos = %v492_bin
+  jump b146
+b148:
+  %v493_load = load state : ParseState
+  %v494_field = field %v493_load.tokens : List<Token>
+  %v495_load = load state : ParseState
+  %v496_field = field %v495_load.pos : i64
+  %v497_index = index %v494_field[%v496_field] : Token
+  %v498_field = field %v497_index.kind : i64
+  %v499_const = const i64 22
+  %v500_bin = eq %v498_field, %v499_const : bool
+  branch %v500_bin ? b152 : b153
+b149:
+  %v479_load = load state : ParseState
+  %v480_field = field %v479_load.tokens : List<Token>
+  %v481_load = load state : ParseState
+  %v482_field = field %v481_load.pos : i64
+  %v483_index = index %v480_field[%v482_field] : Token
+  %v484_field = field %v483_index.kind : i64
+  %v485_const = const i64 0
+  %v486_bin = ne %v484_field, %v485_const : bool
+  store __logic_478, %v486_bin
+  jump b151
+b150:
+  %v487_logic = const bool false
+  store __logic_478, %v487_logic
+  jump b151
+b151:
+  %v488_logic = load __logic_478 : bool
+  branch %v488_logic ? b147 : b148
+b152:
+  %v501_load = load state : ParseState
+  %v502_field = field %v501_load.pos : i64
+  %v503_const = const i64 1
+  %v504_bin = add %v502_field, %v503_const : i64
+  field_set state.pos = %v504_bin
+  jump b153
+b153:
+  %v505_load = load out : string
+  %v506_const = const string "function "
+  %v507_bin = string_concat %v505_load, %v506_const : string
+  %v508_load = load name : string
+  %v509_bin = string_concat %v507_bin, %v508_load : string
+  %v510_const = const string "\n"
+  %v511_bin = string_concat %v509_bin, %v510_const : string
+  store out, %v511_bin
+  jump b154
+b154:
+  %v512_load = load state : ParseState
+  %v513_field = field %v512_load.tokens : List<Token>
+  %v514_load = load state : ParseState
+  %v515_field = field %v514_load.pos : i64
+  %v516_index = index %v513_field[%v515_field] : Token
+  %v517_field = field %v516_index.kind : i64
+  %v518_const = const i64 23
+  %v519_bin = ne %v517_field, %v518_const : bool
+  local bool __logic_520
+  branch %v519_bin ? b157 : b158
+b155:
+  %v531_load = load state : ParseState
+  %v532_field = field %v531_load.tokens : List<Token>
+  %v533_load = load state : ParseState
+  %v534_field = field %v533_load.pos : i64
+  %v535_index = index %v532_field[%v534_field] : Token
+  %v536_field = field %v535_index.kind : i64
+  %v537_const = const i64 11
+  %v538_bin = eq %v536_field, %v537_const : bool
+  branch %v538_bin ? b160 : b161
+b156:
+  %v658_load = load state : ParseState
+  %v659_field = field %v658_load.tokens : List<Token>
+  %v660_load = load state : ParseState
+  %v661_field = field %v660_load.pos : i64
+  %v662_index = index %v659_field[%v661_field] : Token
+  %v663_field = field %v662_index.kind : i64
+  %v664_const = const i64 23
+  %v665_bin = eq %v663_field, %v664_const : bool
+  branch %v665_bin ? b178 : b179
+b157:
+  %v521_load = load state : ParseState
+  %v522_field = field %v521_load.tokens : List<Token>
+  %v523_load = load state : ParseState
+  %v524_field = field %v523_load.pos : i64
+  %v525_index = index %v522_field[%v524_field] : Token
+  %v526_field = field %v525_index.kind : i64
+  %v527_const = const i64 0
+  %v528_bin = ne %v526_field, %v527_const : bool
+  store __logic_520, %v528_bin
+  jump b159
+b158:
+  %v529_logic = const bool false
+  store __logic_520, %v529_logic
+  jump b159
+b159:
+  %v530_logic = load __logic_520 : bool
+  branch %v530_logic ? b155 : b156
+b160:
+  %v539_load = load state : ParseState
+  %v540_field = field %v539_load.pos : i64
+  %v541_const = const i64 1
+  %v542_bin = add %v540_field, %v541_const : i64
+  field_set state.pos = %v542_bin
+  %v543_load = load state : ParseState
+  %v544_field = field %v543_load.tokens : List<Token>
+  %v545_load = load state : ParseState
+  %v546_field = field %v545_load.pos : i64
+  %v547_index = index %v544_field[%v546_field] : Token
+  %v548_field = field %v547_index.text : string
+  local string variable
+  store variable, %v548_field
+  %v549_load = load state : ParseState
+  %v550_field = field %v549_load.pos : i64
+  %v551_const = const i64 1
+  %v552_bin = add %v550_field, %v551_const : i64
+  field_set state.pos = %v552_bin
+  jump b163
+b161:
+  %v617_load = load state : ParseState
+  %v618_field = field %v617_load.tokens : List<Token>
+  %v619_load = load state : ParseState
+  %v620_field = field %v619_load.pos : i64
+  %v621_index = index %v618_field[%v620_field] : Token
+  %v622_field = field %v621_index.kind : i64
+  %v623_const = const i64 12
+  %v624_bin = eq %v622_field, %v623_const : bool
+  branch %v624_bin ? b173 : b174
+b162:
+  jump b154
+b163:
+  %v553_load = load state : ParseState
+  %v554_field = field %v553_load.tokens : List<Token>
+  %v555_load = load state : ParseState
+  %v556_field = field %v555_load.pos : i64
+  %v557_index = index %v554_field[%v556_field] : Token
+  %v558_field = field %v557_index.kind : i64
+  %v559_const = const i64 25
+  %v560_bin = ne %v558_field, %v559_const : bool
+  local bool __logic_561
+  branch %v560_bin ? b166 : b167
+b164:
+  %v572_load = load state : ParseState
+  %v573_field = field %v572_load.pos : i64
+  %v574_const = const i64 1
+  %v575_bin = add %v573_field, %v574_const : i64
+  field_set state.pos = %v575_bin
+  jump b163
+b165:
+  %v576_load = load state : ParseState
+  %v577_field = field %v576_load.tokens : List<Token>
+  %v578_load = load state : ParseState
+  %v579_field = field %v578_load.pos : i64
+  %v580_index = index %v577_field[%v579_field] : Token
+  %v581_field = field %v580_index.kind : i64
+  %v582_const = const i64 25
+  %v583_bin = eq %v581_field, %v582_const : bool
+  branch %v583_bin ? b169 : b170
+b166:
+  %v562_load = load state : ParseState
+  %v563_field = field %v562_load.tokens : List<Token>
+  %v564_load = load state : ParseState
+  %v565_field = field %v564_load.pos : i64
+  %v566_index = index %v563_field[%v565_field] : Token
+  %v567_field = field %v566_index.kind : i64
+  %v568_const = const i64 0
+  %v569_bin = ne %v567_field, %v568_const : bool
+  store __logic_561, %v569_bin
+  jump b168
+b167:
+  %v570_logic = const bool false
+  store __logic_561, %v570_logic
+  jump b168
+b168:
+  %v571_logic = load __logic_561 : bool
+  branch %v571_logic ? b164 : b165
+b169:
+  %v584_load = load state : ParseState
+  %v585_field = field %v584_load.pos : i64
+  %v586_const = const i64 1
+  %v587_bin = add %v585_field, %v586_const : i64
+  field_set state.pos = %v587_bin
+  jump b170
+b170:
+  %v588_load = load state : ParseState
+  %v589_const = const i64 0
+  %v590_call = call parseExpression(%v588_load, %v589_const) : ParseState
+  store state, %v590_call
+  %v591_load = load out : string
+  %v592_const = const string "let "
+  %v593_bin = string_concat %v591_load, %v592_const : string
+  %v594_load = load variable : string
+  %v595_bin = string_concat %v593_bin, %v594_load : string
+  %v596_const = const string "\n"
+  %v597_bin = string_concat %v595_bin, %v596_const : string
+  store out, %v597_bin
+  %v598_load = load out : string
+  %v599_load = load state : ParseState
+  %v600_field = field %v599_load.nodes : List<Expr>
+  %v601_load = load state : ParseState
+  %v602_field = field %v601_load.last : i64
+  %v603_call = call lowerExpr(%v600_field, %v602_field) : string
+  %v604_bin = string_concat %v598_load, %v603_call : string
+  store out, %v604_bin
+  %v605_load = load state : ParseState
+  %v606_field = field %v605_load.tokens : List<Token>
+  %v607_load = load state : ParseState
+  %v608_field = field %v607_load.pos : i64
+  %v609_index = index %v606_field[%v608_field] : Token
+  %v610_field = field %v609_index.kind : i64
+  %v611_const = const i64 24
+  %v612_bin = eq %v610_field, %v611_const : bool
+  branch %v612_bin ? b171 : b172
+b171:
+  %v613_load = load state : ParseState
+  %v614_field = field %v613_load.pos : i64
+  %v615_const = const i64 1
+  %v616_bin = add %v614_field, %v615_const : i64
+  field_set state.pos = %v616_bin
+  jump b172
+b172:
+  jump b162
+b173:
+  %v625_load = load state : ParseState
+  %v626_field = field %v625_load.pos : i64
+  %v627_const = const i64 1
+  %v628_bin = add %v626_field, %v627_const : i64
+  field_set state.pos = %v628_bin
+  %v629_load = load state : ParseState
+  %v630_const = const i64 0
+  %v631_call = call parseExpression(%v629_load, %v630_const) : ParseState
+  store state, %v631_call
+  %v632_load = load out : string
+  %v633_load = load state : ParseState
+  %v634_field = field %v633_load.nodes : List<Expr>
+  %v635_load = load state : ParseState
+  %v636_field = field %v635_load.last : i64
+  %v637_call = call lowerExpr(%v634_field, %v636_field) : string
+  %v638_bin = string_concat %v632_load, %v637_call : string
+  store out, %v638_bin
+  %v639_load = load out : string
+  %v640_const = const string "return\n"
+  %v641_bin = string_concat %v639_load, %v640_const : string
+  store out, %v641_bin
+  %v642_load = load state : ParseState
+  %v643_field = field %v642_load.tokens : List<Token>
+  %v644_load = load state : ParseState
+  %v645_field = field %v644_load.pos : i64
+  %v646_index = index %v643_field[%v645_field] : Token
+  %v647_field = field %v646_index.kind : i64
+  %v648_const = const i64 24
+  %v649_bin = eq %v647_field, %v648_const : bool
+  branch %v649_bin ? b176 : b177
+b174:
+  %v654_load = load state : ParseState
+  %v655_field = field %v654_load.pos : i64
+  %v656_const = const i64 1
+  %v657_bin = add %v655_field, %v656_const : i64
+  field_set state.pos = %v657_bin
+  jump b175
+b175:
+  jump b162
+b176:
+  %v650_load = load state : ParseState
+  %v651_field = field %v650_load.pos : i64
+  %v652_const = const i64 1
+  %v653_bin = add %v651_field, %v652_const : i64
+  field_set state.pos = %v653_bin
+  jump b177
+b177:
+  jump b175
+b178:
+  %v666_load = load state : ParseState
+  %v667_field = field %v666_load.pos : i64
+  %v668_const = const i64 1
+  %v669_bin = add %v667_field, %v668_const : i64
+  field_set state.pos = %v669_bin
+  jump b179
+b179:
+  jump b145
+function main() -> i64
+b180:
+  %v675_const = const string "stage1/input.raz"
+  %v676_call = builtin read_file(%v675_const) : string
+  local string source
+  store source, %v676_call
+  %v677_load = load source : string
+  %v678_call = call compileSubset(%v677_load) : string
+  local string rir
+  store rir, %v678_call
+  %v679_const = const string "stage1/output.rir"
+  %v680_load = load rir : string
+  _ = builtin write_file(%v679_const, %v680_load) : void
+  %v681_load = load rir : string
+  %v682_call = builtin string_length(%v681_load) : i64
+  return %v682_call
+generated stage1/compiler.cpp

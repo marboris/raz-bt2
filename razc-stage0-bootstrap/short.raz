@@ -1,0 +1,12 @@
+function side() -> bool {
+    print("SIDE");
+    return true;
+}
+
+function main() -> i64 {
+    let a: bool = false;
+    if (a && side()) {
+        return 1;
+    }
+    return 0;
+}

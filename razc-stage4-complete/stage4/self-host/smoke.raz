@@ -1,0 +1,12 @@
+struct S {
+    xs: List<i64>;
+}
+function mutate(state: Ref<S>) -> i64 {
+    push(state.xs, 9);
+    return length(state.xs);
+}
+function main() -> i64 {
+    let s: S = new S();
+    s.xs = [1, 2];
+    return mutate(s);
+}

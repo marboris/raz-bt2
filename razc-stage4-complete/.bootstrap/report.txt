@@ -1,0 +1,7 @@
+Raz bootstrap report
+=====================
+source: /home/clever/Desktop/mrb/hezareh/Oort/archive/raz-bootstrap-js/razc-stage4-complete/stage1/compiler.raz
+stage-1 RIR bytes: 169098
+frontend self-parse: OK
+host rebuild: OK
+RIR exact match: OK

@@ -1,0 +1,8 @@
+function main() -> i64 {
+    let xs: List<i64> = [];
+    xs = append(xs, 10);
+    xs = append(xs, 20);
+    let s: string = "abcdef";
+    let t: string = slice(s, 1, 4);
+    return xs[1] - length(t) * 5;
+}

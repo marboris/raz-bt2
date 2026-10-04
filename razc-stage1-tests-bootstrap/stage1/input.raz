@@ -1,0 +1,4 @@
+function add_demo() -> i64 {
+    let a = 40;
+    return a + 2 * 3;
+}

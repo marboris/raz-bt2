@@ -1,0 +1,5 @@
+function main() -> i64 {
+    let xs: List<i64> = [10, 20, 30];
+    xs[1] = 42;
+    return xs[1];
+}
